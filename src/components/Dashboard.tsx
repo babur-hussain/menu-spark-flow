@@ -146,7 +146,11 @@ const Dashboard = () => {
                       <div className="text-sm text-foreground/80">
                         Updated 2 minutes ago
                       </div>
-                      <Button variant="outline" size="sm">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => alert('Opening full dashboard...')}
+                      >
                         View Full Dashboard
                       </Button>
                     </div>
@@ -253,7 +257,11 @@ const Dashboard = () => {
           <p className="text-lg text-muted-foreground mb-6">
             Ready to get insights that drive growth?
           </p>
-          <Button variant="hero" size="xl">
+          <Button 
+            variant="hero" 
+            size="xl"
+            onClick={() => window.open('#features', '_self')}
+          >
             Start Your Analytics Journey
           </Button>
         </div>

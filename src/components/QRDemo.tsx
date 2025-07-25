@@ -2,11 +2,15 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { QrCode, Smartphone, Scan, ArrowRight, CheckCircle } from "lucide-react";
+import { QrCode, Smartphone, Scan, ArrowRight, CheckCircle, ShoppingCart, Plus } from "lucide-react";
 import qrIcon from "@/assets/qr-icon.jpg";
+import gourmetBurger from "@/assets/gourmet-burger.jpg";
+import trufflePizza from "@/assets/truffle-pizza.jpg";
+import caesarSalad from "@/assets/caesar-salad.jpg";
 
 const QRDemo = () => {
   const [currentStep, setCurrentStep] = useState(0);
+  const [cart, setCart] = useState<{[key: string]: number}>({});
 
   const steps = [
     {
@@ -41,23 +45,37 @@ const QRDemo = () => {
       price: "$18.99",
       description: "Juicy beef patty with artisanal cheese",
       rating: 4.8,
-      image: "🍔"
+      image: gourmetBurger,
+      id: "burger"
     },
     {
       name: "Truffle Pizza",
       price: "$24.99",
       description: "Hand-tossed with black truffle oil",
       rating: 4.9,
-      image: "🍕"
+      image: trufflePizza,
+      id: "pizza"
     },
     {
       name: "Caesar Salad",
       price: "$14.99",
       description: "Fresh romaine with house-made dressing",
       rating: 4.7,
-      image: "🥗"
+      image: caesarSalad,
+      id: "salad"
     }
   ];
+
+  const addToCart = (itemId: string) => {
+    setCart(prev => ({
+      ...prev,
+      [itemId]: (prev[itemId] || 0) + 1
+    }));
+  };
+
+  const getTotalItems = () => {
+    return Object.values(cart).reduce((sum, count) => sum + count, 0);
+  };
 
   return (
     <section id="qr" className="py-20 bg-background">
@@ -117,15 +135,23 @@ const QRDemo = () => {
               ))}
             </div>
 
-            <Button 
-              variant="gradient" 
-              size="lg" 
-              className="w-full lg:w-auto"
-              onClick={() => setCurrentStep((prev) => (prev + 1) % 4)}
-            >
-              {currentStep < 3 ? "Next Step" : "Restart Demo"}
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
+            <div className="flex gap-4">
+              <Button 
+                variant="gradient" 
+                size="lg" 
+                className="flex-1"
+                onClick={() => setCurrentStep((prev) => (prev + 1) % 4)}
+              >
+                {currentStep < 3 ? "Next Step" : "Restart Demo"}
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+              {getTotalItems() > 0 && (
+                <Button variant="fresh" size="lg" className="flex items-center gap-2">
+                  <ShoppingCart className="h-4 w-4" />
+                  Cart ({getTotalItems()})
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Right: Demo Interface */}
@@ -163,18 +189,35 @@ const QRDemo = () => {
                   {menuItems.slice(0, currentStep + 1).map((item, index) => (
                     <div 
                       key={index}
-                      className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors duration-200"
+                      className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-all duration-200 group"
                     >
-                      <div className="text-3xl">{item.image}</div>
+                      <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
+                        <img 
+                          src={item.image} 
+                          alt={item.name}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                        />
+                      </div>
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-1">
                           <h4 className="font-medium">{item.name}</h4>
                           <span className="font-bold text-primary">{item.price}</span>
                         </div>
                         <p className="text-sm text-muted-foreground mb-1">{item.description}</p>
-                        <div className="flex items-center gap-1">
-                          <span className="text-yellow-500">★</span>
-                          <span className="text-sm">{item.rating}</span>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1">
+                            <span className="text-yellow-500">★</span>
+                            <span className="text-sm">{item.rating}</span>
+                          </div>
+                          <Button 
+                            variant="food" 
+                            size="sm"
+                            onClick={() => addToCart(item.id)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Add
+                          </Button>
                         </div>
                       </div>
                     </div>

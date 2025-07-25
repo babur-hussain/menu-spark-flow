@@ -1,5 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { 
   QrCode, 
   Users, 
@@ -153,12 +154,18 @@ const Features = () => {
             Ready to transform your restaurant operations?
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="btn-hero">
+            <Button 
+              variant="hero" 
+              onClick={() => window.open('#qr', '_self')}
+            >
               Start Free Trial
-            </button>
-            <button className="px-8 py-4 rounded-xl border border-border hover:border-primary/50 transition-colors duration-200">
+            </Button>
+            <Button 
+              variant="electric" 
+              onClick={() => window.open('#analytics', '_self')}
+            >
               Schedule Demo
-            </button>
+            </Button>
           </div>
         </div>
       </div>

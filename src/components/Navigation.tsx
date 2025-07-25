@@ -29,13 +29,21 @@ const Navigation = () => {
               <a
                 key={item.name}
                 href={item.href}
-                className="text-muted-foreground hover:text-primary transition-colors duration-200 flex items-center gap-2"
+                className="text-muted-foreground hover:text-primary transition-colors duration-200 flex items-center gap-2 font-medium"
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.querySelector(item.href)?.scrollIntoView({ behavior: 'smooth' });
+                }}
               >
                 <item.icon className="h-4 w-4" />
                 {item.name}
               </a>
             ))}
-            <Button variant="hero" size="lg">
+            <Button 
+              variant="hero" 
+              size="lg"
+              onClick={() => alert('Welcome! Starting your restaurant transformation journey...')}
+            >
               Get Started
             </Button>
           </div>
@@ -60,15 +68,27 @@ const Navigation = () => {
                 <a
                   key={item.name}
                   href={item.href}
-                  className="block px-3 py-2 text-muted-foreground hover:text-primary transition-colors duration-200 flex items-center gap-2"
-                  onClick={() => setIsOpen(false)}
+                  className="block px-3 py-2 text-muted-foreground hover:text-primary transition-colors duration-200 flex items-center gap-2 font-medium"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setIsOpen(false);
+                    document.querySelector(item.href)?.scrollIntoView({ behavior: 'smooth' });
+                  }}
                 >
                   <item.icon className="h-4 w-4" />
                   {item.name}
                 </a>
               ))}
               <div className="px-3 py-2">
-                <Button variant="hero" size="lg" className="w-full">
+                <Button 
+                  variant="hero" 
+                  size="lg" 
+                  className="w-full"
+                  onClick={() => {
+                    setIsOpen(false);
+                    alert('Welcome! Starting your restaurant transformation journey...');
+                  }}
+                >
                   Get Started
                 </Button>
               </div>

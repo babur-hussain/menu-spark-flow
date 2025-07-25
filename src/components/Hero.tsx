@@ -61,10 +61,20 @@ const Hero = () => {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
-            <Button variant="hero" size="xl" className="animate-pulse-warm shadow-2xl">
+            <Button 
+              variant="hero" 
+              size="xl" 
+              className="animate-pulse-warm shadow-2xl"
+              onClick={() => alert('🚀 Welcome to MenuMaster! Your free trial is starting...')}
+            >
               🚀 Start Free Trial
             </Button>
-            <Button variant="electric" size="xl" className="shadow-xl">
+            <Button 
+              variant="electric" 
+              size="xl" 
+              className="shadow-xl"
+              onClick={() => document.querySelector('#qr')?.scrollIntoView({ behavior: 'smooth' })}
+            >
               ▶️ Watch Demo
             </Button>
           </div>
