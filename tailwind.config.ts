@@ -45,6 +45,18 @@ export default {
 					DEFAULT: 'hsl(var(--accent))',
 					foreground: 'hsl(var(--accent-foreground))'
 				},
+				electric: {
+					DEFAULT: 'hsl(var(--electric-blue))'
+				},
+				lime: {
+					DEFAULT: 'hsl(var(--lime-green))'
+				},
+				hotpink: {
+					DEFAULT: 'hsl(var(--hot-pink))'
+				},
+				purple: {
+					DEFAULT: 'hsl(var(--purple-punch))'
+				},
 				success: {
 					DEFAULT: 'hsl(var(--success))',
 					foreground: 'hsl(var(--success-foreground))'

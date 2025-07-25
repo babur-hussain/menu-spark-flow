@@ -28,15 +28,15 @@ const Hero = () => {
         <div className="text-center">
           {/* Badge */}
           <div className="flex justify-center mb-6">
-            <Badge variant="secondary" className="px-4 py-2 text-lg animate-pulse-warm">
-              🚀 Revolutionary Restaurant Technology
+            <Badge variant="secondary" className="px-6 py-3 text-lg animate-pulse-warm shadow-lg border-2 border-primary/30">
+              ✨ Revolutionary Restaurant Technology ✨
             </Badge>
           </div>
 
           {/* Main Heading */}
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6">
             Transform Your
-            <span className="text-gradient block mt-2">Restaurant Experience</span>
+            <span className="text-gradient block mt-2 animate-pulse">Restaurant Experience</span>
           </h1>
 
           {/* Subtitle */}
@@ -60,12 +60,12 @@ const Hero = () => {
           </div>
 
           {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Button variant="hero" size="xl" className="animate-pulse-warm">
-              Start Free Trial
+          <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
+            <Button variant="hero" size="xl" className="animate-pulse-warm shadow-2xl">
+              🚀 Start Free Trial
             </Button>
-            <Button variant="outline" size="xl">
-              Watch Demo
+            <Button variant="electric" size="xl" className="shadow-xl">
+              ▶️ Watch Demo
             </Button>
           </div>
 

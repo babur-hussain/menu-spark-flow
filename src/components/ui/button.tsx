@@ -19,10 +19,12 @@ const buttonVariants = cva(
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
         hero: "btn-hero",
-        success: "bg-success text-success-foreground hover:bg-success/90",
-        warning: "bg-warning text-warning-foreground hover:bg-warning/90",
-        gradient: "bg-gradient-to-r from-primary to-accent text-white hover:opacity-90 shadow-lg hover:shadow-xl transition-all duration-300",
-        food: "bg-card border-2 border-primary/20 text-card-foreground hover:border-primary/40 hover:bg-primary/5 transition-all duration-300"
+        success: "bg-success text-success-foreground hover:bg-success/90 shadow-lg hover:shadow-xl transition-all duration-300",
+        warning: "bg-warning text-warning-foreground hover:bg-warning/90 shadow-lg hover:shadow-xl transition-all duration-300",
+        gradient: "text-white hover:scale-105 shadow-lg hover:shadow-2xl transition-all duration-300" + " " + "bg-gradient-to-br from-primary via-accent to-primary",
+        electric: "text-white hover:scale-105 shadow-lg hover:shadow-2xl transition-all duration-300" + " " + "bg-gradient-to-br from-electric via-purple to-hotpink",
+        fresh: "text-white hover:scale-105 shadow-lg hover:shadow-2xl transition-all duration-300" + " " + "bg-gradient-to-br from-lime via-electric to-primary",
+        food: "bg-card border-2 border-primary/30 text-card-foreground hover:border-primary/60 hover:bg-primary/10 hover:scale-102 shadow-md hover:shadow-lg transition-all duration-300"
       },
       size: {
         default: "h-10 px-4 py-2",
