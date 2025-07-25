@@ -2,39 +2,72 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
+/* Restaurant Menu System Design - Appetite-Stimulating Color Palette
+All colors MUST be HSL for consistency and theming.
 */
 
 @layer base {
   :root {
+    /* Base colors - Clean whites and warm neutrals */
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 24 100% 5%;
 
+    /* Card system - Subtle warmth */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 24 100% 5%;
 
+    /* Popover system */
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 24 100% 5%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Primary - Vibrant Orange (appetite-stimulating) */
+    --primary: 18 100% 62%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 18 100% 58%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Secondary - Warm Golden */
+    --secondary: 45 100% 70%;
+    --secondary-foreground: 24 100% 15%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Muted - Warm neutral */
+    --muted: 30 40% 96%;
+    --muted-foreground: 30 8% 46%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Accent - Rich Red (for CTAs and highlights) */
+    --accent: 354 84% 57%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* Success - Fresh Green */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    /* Warning - Golden Yellow */
+    --warning: 45 93% 58%;
+    --warning-foreground: 24 100% 15%;
+
+    /* Destructive - Deep Red */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Form elements */
+    --border: 30 30% 88%;
+    --input: 30 30% 88%;
+    --ring: 18 100% 62%;
+
+    /* Food-themed gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(18 100% 62%), hsl(354 84% 57%));
+    --gradient-secondary: linear-gradient(135deg, hsl(45 100% 70%), hsl(18 100% 62%));
+    --gradient-warm: linear-gradient(180deg, hsl(45 100% 95%), hsl(18 20% 96%));
+    --gradient-sunset: linear-gradient(135deg, hsl(354 84% 57%), hsl(18 100% 62%), hsl(45 100% 70%));
+
+    /* Shadows with warm tints */
+    --shadow-warm: 0 4px 12px hsl(18 100% 62% / 0.15);
+    --shadow-elegant: 0 8px 25px hsl(18 100% 62% / 0.2);
+    --shadow-card: 0 2px 8px hsl(24 100% 5% / 0.08);
+
+    /* Animation variables */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
     --radius: 0.5rem;
 
@@ -56,33 +89,47 @@ All colors MUST be HSL.
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* Dark mode - Rich, warm darks with orange accents */
+    --background: 24 100% 3%;
+    --foreground: 30 40% 95%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 24 50% 5%;
+    --card-foreground: 30 40% 95%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 24 50% 5%;
+    --popover-foreground: 30 40% 95%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 18 100% 62%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 18 100% 58%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 24 30% 12%;
+    --secondary-foreground: 30 40% 85%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 24 30% 12%;
+    --muted-foreground: 30 20% 65%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 354 84% 57%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --warning: 45 93% 58%;
+    --warning-foreground: 24 100% 5%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 24 30% 18%;
+    --input: 24 30% 18%;
+    --ring: 18 100% 62%;
+
+    /* Dark mode gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(18 100% 62%), hsl(354 84% 57%));
+    --gradient-secondary: linear-gradient(135deg, hsl(45 100% 70%), hsl(18 100% 62%));
+    --gradient-warm: linear-gradient(180deg, hsl(24 50% 8%), hsl(24 30% 5%));
+    --gradient-sunset: linear-gradient(135deg, hsl(354 84% 57%), hsl(18 100% 62%), hsl(45 100% 70%));
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -101,5 +148,82 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
+}
+
+@layer components {
+  /* Hero button with appetite-stimulating gradient */
+  .btn-hero {
+    @apply bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 rounded-xl font-semibold text-lg;
+    background: var(--gradient-primary);
+    box-shadow: var(--shadow-warm);
+    transition: var(--transition-smooth);
+  }
+  
+  .btn-hero:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-elegant);
+  }
+
+  /* Card with warm styling */
+  .card-warm {
+    @apply bg-card border border-border rounded-xl;
+    box-shadow: var(--shadow-card);
+    transition: var(--transition-smooth);
+  }
+  
+  .card-warm:hover {
+    box-shadow: var(--shadow-warm);
+    transform: translateY(-1px);
+  }
+
+  /* Gradient text effects */
+  .text-gradient {
+    background: var(--gradient-sunset);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-size: 200% 200%;
+    animation: gradient-shift 3s ease infinite;
+  }
+
+  /* Food item hover effect */
+  .food-item {
+    @apply card-warm p-4 cursor-pointer;
+    transition: var(--transition-bounce);
+  }
+  
+  .food-item:hover {
+    transform: scale(1.02);
+    box-shadow: var(--shadow-elegant);
+  }
+
+  /* QR code styling */
+  .qr-container {
+    @apply p-6 bg-card rounded-2xl border-2 border-primary/20;
+    background: radial-gradient(circle at center, hsl(var(--primary)/0.05), transparent);
+  }
+}
+
+@layer utilities {
+  /* Animation keyframes */
+  @keyframes gradient-shift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+  
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+  }
+  
+  @keyframes pulse-warm {
+    0%, 100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.7); }
+    70% { box-shadow: 0 0 0 10px hsl(var(--primary) / 0); }
+  }
+
+  /* Utility classes */
+  .animate-float { animation: float 3s ease-in-out infinite; }
+  .animate-pulse-warm { animation: pulse-warm 2s infinite; }
 }
