@@ -40,6 +40,12 @@ const Navigation = () => {
               </a>
             ))}
             <Button 
+              variant="outline"
+              onClick={() => window.location.href = '/admin/login'}
+            >
+              Admin Login
+            </Button>
+            <Button 
               variant="hero" 
               size="lg"
               onClick={() => window.location.href = '/restaurant-registration'}
@@ -79,7 +85,18 @@ const Navigation = () => {
                   {item.name}
                 </a>
               ))}
-              <div className="px-3 py-2">
+              <div className="px-3 py-2 space-y-2">
+                <Button 
+                  variant="outline" 
+                  size="lg" 
+                  className="w-full"
+                  onClick={() => {
+                    setIsOpen(false);
+                    window.location.href = '/admin/login';
+                  }}
+                >
+                  Admin Login
+                </Button>
                 <Button 
                   variant="hero" 
                   size="lg" 
