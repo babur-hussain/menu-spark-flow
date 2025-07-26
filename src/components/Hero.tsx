@@ -65,7 +65,7 @@ const Hero = () => {
               variant="hero" 
               size="xl" 
               className="animate-pulse-warm shadow-2xl"
-              onClick={() => alert('🚀 Welcome to MenuMaster! Your free trial is starting...')}
+              onClick={() => window.location.href = '/restaurant-registration'}
             >
               🚀 Start Free Trial
             </Button>

@@ -42,7 +42,7 @@ const Navigation = () => {
             <Button 
               variant="hero" 
               size="lg"
-              onClick={() => alert('Welcome! Starting your restaurant transformation journey...')}
+              onClick={() => window.location.href = '/restaurant-registration'}
             >
               Get Started
             </Button>
@@ -86,7 +86,7 @@ const Navigation = () => {
                   className="w-full"
                   onClick={() => {
                     setIsOpen(false);
-                    alert('Welcome! Starting your restaurant transformation journey...');
+                    window.location.href = '/restaurant-registration';
                   }}
                 >
                   Get Started
