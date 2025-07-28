@@ -12,6 +12,7 @@ import { Plus, Minus, ShoppingCart, Star, Clock, Leaf, Flame, Heart, Sparkles, M
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { orderHistoryService } from '@/lib/orderHistoryService';
+import { formatCurrency } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertCircle, ArrowLeft, Utensils } from 'lucide-react';
 
@@ -346,7 +347,7 @@ export default function Order() {
       return;
     }
     if (getCartTotal() < found.min) {
-      setCouponError(`Minimum order $${found.min} required for this coupon.`);
+                setCouponError(`Minimum order ${formatCurrency(found.min)} required for this coupon.`);
       setAppliedCoupon(null);
       setDiscount(0);
       return;
@@ -591,7 +592,7 @@ export default function Order() {
         <div class="total">
           <div class="item">
             <span>Total Amount:</span>
-            <span>$${order.total_amount || order.total}</span>
+                                    <span>{formatCurrency(order.total_amount || order.total)}</span>
           </div>
         </div>
         
@@ -1172,7 +1173,7 @@ export default function Order() {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-yellow-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-yellow-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 overflow-x-hidden">
       {/* Top Navigation Bar */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-700 shadow-lg">
         <div className="flex items-center justify-between px-4 py-3">
@@ -1386,7 +1387,7 @@ export default function Order() {
           </div>
         </div>
       ) : (
-        <div>
+        <div className="min-h-screen pb-32 md:pb-0">
           {/* Restaurant Header */}
           <div className="relative h-64 md:h-80 bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 dark:from-orange-600 dark:via-red-600 dark:to-pink-600 overflow-hidden">
             {restaurant?.cover_image_url ? (
@@ -1424,12 +1425,12 @@ export default function Order() {
 
           {/* Category Navigation */}
           <div className="px-4 py-6">
-            <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
+            <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide -mx-4 px-4">
               {categories.map((category) => (
                 <button
                   key={category.id}
                   onClick={() => setSelectedCategory(category.id)}
-                  className={`px-6 py-3 rounded-full whitespace-nowrap transition-all duration-200 font-medium ${
+                  className={`px-6 py-4 rounded-full whitespace-nowrap transition-all duration-200 font-medium text-base ${
                     selectedCategory === category.id
                       ? 'bg-orange-500 text-white shadow-lg'
                       : 'bg-white/80 dark:bg-gray-800/80 text-gray-700 dark:text-gray-300 hover:bg-orange-100 dark:hover:bg-orange-900/20'
@@ -1442,7 +1443,7 @@ export default function Order() {
           </div>
 
           {/* Menu Items */}
-          <div className="px-4 pb-6">
+          <div className="px-4 pb-32 md:pb-6">
             {itemsToShow.length === 0 ? (
               <div className="text-center py-12">
                 <Utensils className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -1451,7 +1452,7 @@ export default function Order() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {itemsToShow.map((item) => (
-                  <Card key={item.id} className="group hover:shadow-xl transition-all duration-300 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+                  <Card key={item.id} className="group hover:shadow-xl transition-all duration-300 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 cursor-pointer">
                     <div className="relative">
                       {item.image_url ? (
                         <img
@@ -1489,12 +1490,12 @@ export default function Order() {
                     <CardContent className="p-4">
                       <div className="flex justify-between items-start mb-2">
                         <h3 className="font-semibold text-gray-900 dark:text-gray-100">{item.name}</h3>
-                        <span className="font-bold text-orange-600 dark:text-orange-400">${item.price.toFixed(2)}</span>
+                        <span className="font-bold text-orange-600 dark:text-orange-400">{formatCurrency(item.price)}</span>
                       </div>
                       <p className="text-gray-600 dark:text-gray-300 text-sm mb-4 line-clamp-2">{item.description}</p>
                       <Button
                         onClick={() => openItemDetails(item)}
-                        className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold"
+                        className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-3 text-base"
                       >
                         {t('addToCart')}
                       </Button>
@@ -1512,7 +1513,7 @@ export default function Order() {
         <div className="p-4">
           <div className="flex justify-between items-center mb-2">
             <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('cart')}</span>
-            <span className="text-lg font-bold text-orange-600 dark:text-orange-400">${getFinalTotal().toFixed(2)}</span>
+            <span className="text-lg font-bold text-orange-600 dark:text-orange-400">{formatCurrency(getFinalTotal())}</span>
           </div>
           <Button
             onClick={() => setShowCartPopup(true)}
@@ -1555,7 +1556,7 @@ export default function Order() {
                         <p className="text-sm text-gray-500 dark:text-gray-400">Qty: {item.quantity}</p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-gray-900 dark:text-gray-100">${(item.price * item.quantity).toFixed(2)}</span>
+                        <span className="font-semibold text-gray-900 dark:text-gray-100">{formatCurrency(item.price * item.quantity)}</span>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -1605,7 +1606,7 @@ export default function Order() {
                 <div className="border-t border-gray-200 dark:border-gray-600 pt-4">
                   <div className="flex justify-between items-center mb-4">
                     <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('total')}</span>
-                    <span className="text-lg font-bold text-orange-600 dark:text-orange-400">${getFinalTotal().toFixed(2)}</span>
+                    <span className="text-lg font-bold text-orange-600 dark:text-orange-400">{formatCurrency(getFinalTotal())}</span>
                   </div>
                   <Button
                     onClick={() => {
@@ -1655,7 +1656,7 @@ export default function Order() {
                           <p className="text-sm text-gray-500 dark:text-gray-400">Qty: {item.quantity}</p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-gray-900 dark:text-gray-100">${(item.price * item.quantity).toFixed(2)}</span>
+                          <span className="font-semibold text-gray-900 dark:text-gray-100">{formatCurrency(item.price * item.quantity)}</span>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -1705,7 +1706,7 @@ export default function Order() {
                   <div className="border-t border-gray-200 dark:border-gray-600 pt-4">
                     <div className="flex justify-between items-center mb-4">
                       <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('total')}</span>
-                      <span className="text-lg font-bold text-orange-600 dark:text-orange-400">${getFinalTotal().toFixed(2)}</span>
+                      <span className="text-lg font-bold text-orange-600 dark:text-orange-400">{formatCurrency(getFinalTotal())}</span>
                     </div>
                     <Button
                       onClick={() => {
@@ -1747,7 +1748,7 @@ export default function Order() {
             </div>
             <div className="flex justify-between items-center text-lg font-semibold">
               <span className="text-gray-700 dark:text-gray-300">Total:</span>
-              <span className="text-orange-600 dark:text-orange-400">${getFinalTotal().toFixed(2)}</span>
+              <span className="text-orange-600 dark:text-orange-400">{formatCurrency(getFinalTotal())}</span>
             </div>
             <Button
               onClick={handlePlaceOrder}
@@ -1785,7 +1786,7 @@ export default function Order() {
                 </p>
                 <div className="flex items-center gap-2 mt-2">
                   <span className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                    ${selectedItem?.price.toFixed(2)}
+                    {formatCurrency(selectedItem?.price || 0)}
                   </span>
                   {selectedItem?.is_featured && (
                     <Badge className="bg-yellow-500 text-white text-xs">Bestseller</Badge>
@@ -1841,7 +1842,7 @@ export default function Order() {
                         <p className="text-sm text-gray-500 dark:text-gray-400">Enhance your meal</p>
                       </div>
                     </div>
-                    <span className="font-semibold text-orange-600 dark:text-orange-400">+${addon.price.toFixed(2)}</span>
+                    <span className="font-semibold text-orange-600 dark:text-orange-400">+{formatCurrency(addon.price)}</span>
                   </label>
                 ))}
               </div>
@@ -1882,7 +1883,7 @@ export default function Order() {
                       </div>
                     </div>
                     <span className="font-semibold text-orange-600 dark:text-orange-400">
-                      {variant.price > 0 ? `+$${variant.price.toFixed(2)}` : 'Free'}
+                      {variant.price > 0 ? `+${formatCurrency(variant.price)}` : 'Free'}
                     </span>
                   </label>
                 ))}
@@ -1906,16 +1907,16 @@ export default function Order() {
               <div>
                 <span className="text-sm text-gray-500 dark:text-gray-400">Total Price</span>
                 <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                  ${selectedItem ? (selectedItem.price + 
+                  {formatCurrency(selectedItem ? (selectedItem.price + 
                     selectedAddons.reduce((sum, addon) => sum + ADDONS.find(a => a.name === addon)?.price || 0, 0) +
                     (selectedVariant !== 'regular' ? VARIANTS.find(v => v.name === selectedVariant)?.price || 0 : 0)
-                  ).toFixed(2) : '0.00'}
+                  ) : 0)}
                 </div>
               </div>
               <div className="text-right">
                 <span className="text-sm text-gray-500 dark:text-gray-400">Base Price</span>
                 <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                  ${selectedItem?.price.toFixed(2)}
+                  {formatCurrency(selectedItem?.price || 0)}
                 </div>
                 {selectedAddons.length > 0 && (
                   <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -2041,7 +2042,7 @@ export default function Order() {
                     </div>
                     <div className="text-right">
                       <div className="font-semibold text-gray-900 dark:text-gray-100">
-                        ${(order.total_amount || order.total).toFixed(2)}
+                        {formatCurrency(order.total_amount || order.total)}
                       </div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
                         {order.items?.length || 0} items
@@ -2281,7 +2282,7 @@ export default function Order() {
                     </div>
                     <div>
                       <p className="text-sm text-gray-600 dark:text-gray-400">Total Amount</p>
-                      <p className="font-bold text-2xl text-gray-900 dark:text-gray-100">${lastOrder.total.toFixed(2)}</p>
+                      <p className="font-bold text-2xl text-gray-900 dark:text-gray-100">{formatCurrency(lastOrder.total)}</p>
                     </div>
                   </div>
                   <div className="text-right">
