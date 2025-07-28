@@ -38,7 +38,8 @@ import {
   MapPin,
   Globe2,
   Calendar,
-  AlertTriangle
+  AlertTriangle,
+  BarChart3
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AdminLayout } from "@/components/admin/AdminLayout";
@@ -468,7 +469,7 @@ export default function Settings() {
                           <div className="flex items-center gap-2">
                             <FormField
                               control={hoursForm.control}
-                              name={`${day.key}_open` as any}
+                              name={`${day.key}_open` as keyof HoursFormData}
                               render={({ field }) => (
                                 <FormItem>
                                   <FormControl>
@@ -480,7 +481,7 @@ export default function Settings() {
                             <span className="text-muted-foreground">to</span>
                             <FormField
                               control={hoursForm.control}
-                              name={`${day.key}_close` as any}
+                              name={`${day.key}_close` as keyof HoursFormData}
                               render={({ field }) => (
                                 <FormItem>
                                   <FormControl>

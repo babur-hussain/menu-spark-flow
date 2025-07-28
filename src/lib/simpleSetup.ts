@@ -1,77 +1,24 @@
 import { supabase } from "../integrations/supabase/client";
 
-export async function setupDatabase() {
+export async function simpleSetupDatabase() {
   try {
-    console.log("Setting up database...");
-
-    // First, fix the user_profiles policies to prevent infinite recursion
-    console.log("Fixing user_profiles policies...");
-    try {
-      // Drop problematic policies
-      await supabase.rpc('exec_sql', { 
-        sql: `
-          DROP POLICY IF EXISTS "Users can view their own profile" ON public.user_profiles;
-          DROP POLICY IF EXISTS "Users can update their own profile" ON public.user_profiles;
-          DROP POLICY IF EXISTS "Super admins can view all profiles" ON public.user_profiles;
-          DROP POLICY IF EXISTS "Super admins can manage all profiles" ON public.user_profiles;
-        `
-      });
-
-      // Create new policies
-      await supabase.rpc('exec_sql', {
-        sql: `
-          CREATE POLICY "Users can view their own profile" 
-          ON public.user_profiles 
-          FOR SELECT 
-          USING (auth.uid() = id);
-
-          CREATE POLICY "Users can update their own profile" 
-          ON public.user_profiles 
-          FOR UPDATE 
-          USING (auth.uid() = id);
-
-          CREATE POLICY "Super admins can view all profiles" 
-          ON public.user_profiles 
-          FOR SELECT 
-          USING (
-            EXISTS (
-              SELECT 1 FROM public.user_profiles up 
-              WHERE up.id = auth.uid() 
-              AND up.role = 'super_admin'
-            )
-          );
-
-          CREATE POLICY "Super admins can manage all profiles" 
-          ON public.user_profiles 
-          FOR ALL 
-          USING (
-            EXISTS (
-              SELECT 1 FROM public.user_profiles up 
-              WHERE up.id = auth.uid() 
-              AND up.role = 'super_admin'
-            )
-          );
-
-          CREATE POLICY "Service role can manage all profiles" 
-          ON public.user_profiles 
-          FOR ALL 
-          USING (auth.role() = 'service_role');
-        `
-      });
-    } catch (policyError) {
-      console.log("Policy fix not applied (may need manual SQL execution):", policyError);
-      throw new Error(`Failed to fix policies: ${policyError.message}`);
-    }
+    console.log("Starting simple database setup...");
 
     // Get current user for restaurant creation
     const { data: { user } } = await supabase.auth.getUser();
     const currentUserId = user?.id || "00000000-0000-0000-0000-000000000000";
 
+    console.log("Current user ID:", currentUserId);
+
     // Create sample restaurants if they don't exist
-    const { data: existingRestaurants } = await supabase
+    const { data: existingRestaurants, error: restaurantsError } = await supabase
       .from('restaurants')
       .select('id')
       .limit(1);
+
+    if (restaurantsError) {
+      console.log("Error checking existing restaurants:", restaurantsError);
+    }
 
     if (!existingRestaurants || existingRestaurants.length === 0) {
       console.log("Creating sample restaurants...");
@@ -98,17 +45,29 @@ export async function setupDatabase() {
       ];
 
       for (const restaurant of sampleRestaurants) {
-        await supabase
+        const { error } = await supabase
           .from('restaurants')
           .insert(restaurant);
+        
+        if (error) {
+          console.log("Error creating restaurant:", error);
+        } else {
+          console.log("Created restaurant:", restaurant.name);
+        }
       }
+    } else {
+      console.log("Restaurants already exist, skipping creation");
     }
 
     // Create sample menu categories
-    const { data: existingCategories } = await supabase
+    const { data: existingCategories, error: categoriesError } = await supabase
       .from('menu_categories')
       .select('id')
       .limit(1);
+
+    if (categoriesError) {
+      console.log("Error checking existing categories:", categoriesError);
+    }
 
     if (!existingCategories || existingCategories.length === 0) {
       console.log("Creating sample menu categories...");
@@ -136,7 +95,7 @@ export async function setupDatabase() {
       if (restaurants) {
         for (const restaurant of restaurants) {
           for (let i = 0; i < sampleCategories.length; i++) {
-            await supabase
+            const { error } = await supabase
               .from('menu_categories')
               .insert({
                 restaurant_id: restaurant.id,
@@ -144,16 +103,28 @@ export async function setupDatabase() {
                 description: sampleCategories[i].description,
                 sort_order: i
               });
+            
+            if (error) {
+              console.log("Error creating category:", error);
+            } else {
+              console.log("Created category:", sampleCategories[i].name);
+            }
           }
         }
       }
+    } else {
+      console.log("Categories already exist, skipping creation");
     }
 
     // Create sample menu items
-    const { data: existingMenuItems } = await supabase
+    const { data: existingMenuItems, error: menuItemsError } = await supabase
       .from('menu_items')
       .select('id')
       .limit(1);
+
+    if (menuItemsError) {
+      console.log("Error checking existing menu items:", menuItemsError);
+    }
 
     if (!existingMenuItems || existingMenuItems.length === 0) {
       console.log("Creating sample menu items...");
@@ -234,7 +205,7 @@ export async function setupDatabase() {
             const item = sampleMenuItems[i];
             const category = restaurantCategories[i % restaurantCategories.length];
             
-            await supabase
+            const { error } = await supabase
               .from('menu_items')
               .insert({
                 restaurant_id: restaurantId,
@@ -249,135 +220,23 @@ export async function setupDatabase() {
                 is_featured: item.is_featured,
                 sort_order: i
               });
-          }
-        }
-      }
-    }
-
-    // Create sample QR codes
-    const { data: existingQRCodes } = await supabase
-      .from('qr_codes')
-      .select('id')
-      .limit(1);
-
-    if (!existingQRCodes || existingQRCodes.length === 0) {
-      console.log("Creating sample QR codes...");
-      
-      const { data: restaurants } = await supabase
-        .from('restaurants')
-        .select('id');
-
-      if (restaurants) {
-        for (const restaurant of restaurants) {
-          const sampleQRCodes = [
-            {
-              name: "Table 1",
-              type: "table",
-              table_number: "1",
-              description: "Main dining area",
-              is_active: true
-            },
-            {
-              name: "Table 2",
-              type: "table",
-              table_number: "2",
-              description: "Main dining area",
-              is_active: true
-            },
-            {
-              name: "Takeaway Counter",
-              type: "takeaway",
-              description: "Pickup counter",
-              is_active: true
-            },
-            {
-              name: "Delivery Zone A",
-              type: "delivery",
-              description: "Local delivery area",
-              is_active: true
-            }
-          ];
-
-          for (const qrCode of sampleQRCodes) {
-            const code = `QR-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            const url = `${window.location.origin}/menu?qr=${code}`;
             
-            await supabase
-              .from('qr_codes')
-              .insert({
-                ...qrCode,
-                restaurant_id: restaurant.id,
-                code,
-                url,
-                scan_count: Math.floor(Math.random() * 50)
-              });
-          }
-        }
-      }
-    }
-
-    // Create sample reviews
-    const { data: existingReviews } = await supabase
-      .from('reviews')
-      .select('id')
-      .limit(1);
-
-    if (!existingReviews || existingReviews.length === 0) {
-      console.log("Creating sample reviews...");
-      
-      const { data: restaurants } = await supabase
-        .from('restaurants')
-        .select('id');
-
-      if (restaurants) {
-        for (const restaurant of restaurants) {
-          const sampleReviews = [
-            {
-              customer_name: "John Smith",
-              customer_email: "john.smith@email.com",
-              rating: 5,
-              comment: "Amazing food and great service! Will definitely come back.",
-              is_approved: true
-            },
-            {
-              customer_name: "Sarah Johnson",
-              customer_email: "sarah.johnson@email.com",
-              rating: 4,
-              comment: "Delicious food, friendly staff. Highly recommend!",
-              is_approved: true
-            },
-            {
-              customer_name: "Mike Davis",
-              customer_email: "mike.davis@email.com",
-              rating: 5,
-              comment: "Best restaurant in town! The food is incredible.",
-              is_approved: true
-            },
-            {
-              customer_name: "Lisa Wilson",
-              customer_email: "lisa.wilson@email.com",
-              rating: 4,
-              comment: "Great atmosphere and wonderful food. Perfect for date night.",
-              is_approved: false
+            if (error) {
+              console.log("Error creating menu item:", error);
+            } else {
+              console.log("Created menu item:", item.name);
             }
-          ];
-
-          for (const review of sampleReviews) {
-            await supabase
-              .from('reviews')
-              .insert({
-                ...review,
-                restaurant_id: restaurant.id
-              });
           }
         }
       }
+    } else {
+      console.log("Menu items already exist, skipping creation");
     }
 
-    console.log("Database setup completed successfully!");
+    console.log("Simple database setup completed successfully!");
     return { success: true, message: "Database setup completed successfully!" };
   } catch (error) {
-    console.error("Error setting up database:", error);
+    console.error("Error in simple database setup:", error);
     throw new Error(`Database setup failed: ${error.message}`);
   }
 } 

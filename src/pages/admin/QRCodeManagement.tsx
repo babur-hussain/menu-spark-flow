@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -26,13 +27,16 @@ import {
   RefreshCw,
   BarChart3,
   Settings,
-  Loader2
+  Loader2,
+  Building2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { useAuth } from "@/contexts/AuthContext";
 import { qrCodeService, QRCode, CreateQRCodeData } from "@/lib/qrCodeService";
+import { supabase } from "@/integrations/supabase/client";
+import QRCodeLib from 'qrcode';
 
 const qrCodeSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -58,6 +62,10 @@ export default function QRCodeManagement() {
     averageScans: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [currentRestaurant, setCurrentRestaurant] = useState<any>(null);
+  const [restaurants, setRestaurants] = useState<any[]>([]);
+  const [isLoadingRestaurants, setIsLoadingRestaurants] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedType, setSelectedType] = useState<string>("all");
@@ -75,16 +83,58 @@ export default function QRCodeManagement() {
     },
   });
 
-  // Fetch QR codes on component mount
+  // Fetch restaurants and set current restaurant
+  useEffect(() => {
+    const fetchRestaurants = async () => {
+      if (!user?.id) return;
+      
+      try {
+        setIsLoadingRestaurants(true);
+        const { data: restaurants, error } = await supabase
+          .from('restaurants')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching restaurants:', error);
+          return;
+        }
+
+        setRestaurants(restaurants || []);
+        
+        // Get the last selected restaurant from localStorage
+        const lastSelectedRestaurantId = localStorage.getItem('selectedRestaurantId');
+        
+        if (lastSelectedRestaurantId && restaurants.some(r => r.id === lastSelectedRestaurantId)) {
+          const selectedRestaurant = restaurants.find(r => r.id === lastSelectedRestaurantId);
+          setCurrentRestaurant(selectedRestaurant);
+        } else if (restaurants.length > 0) {
+          // If no saved restaurant or saved restaurant doesn't exist, use the first one
+          setCurrentRestaurant(restaurants[0]);
+          localStorage.setItem('selectedRestaurantId', restaurants[0].id);
+        }
+      } catch (error) {
+        console.error('Error fetching restaurants:', error);
+      } finally {
+        setIsLoadingRestaurants(false);
+      }
+    };
+
+    fetchRestaurants();
+  }, [user?.id]);
+
+  // Fetch QR codes when current restaurant changes
   useEffect(() => {
     const fetchQRCodes = async () => {
-      if (!user?.restaurant_id) return;
+      if (!user || !currentRestaurant) return;
       
       try {
         setIsLoading(true);
+        
         const [qrCodesData, statsData] = await Promise.all([
-          qrCodeService.getQRCodes(user.restaurant_id),
-          qrCodeService.getQRCodeStats(user.restaurant_id),
+          qrCodeService.getQRCodes(currentRestaurant.id),
+          qrCodeService.getQRCodeStats(currentRestaurant.id),
         ]);
         setQrCodes(qrCodesData);
         setQrCodeStats(statsData);
@@ -100,8 +150,18 @@ export default function QRCodeManagement() {
       }
     };
 
-    fetchQRCodes();
-  }, [user?.restaurant_id, toast]);
+    if (currentRestaurant) {
+      fetchQRCodes();
+    }
+  }, [user, currentRestaurant, toast]);
+
+  const handleRestaurantChange = (restaurantId: string) => {
+    const selectedRestaurant = restaurants.find(r => r.id === restaurantId);
+    if (selectedRestaurant) {
+      setCurrentRestaurant(selectedRestaurant);
+      localStorage.setItem('selectedRestaurantId', restaurantId);
+    }
+  };
 
   const filteredQRCodes = qrCodes.filter(qr => {
     const matchesSearch = qr.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -111,24 +171,30 @@ export default function QRCodeManagement() {
   });
 
   const onSubmit = async (data: QRCodeFormData) => {
-    if (!user?.restaurant_id) {
+    if (!user || !currentRestaurant) {
       toast({
         title: "Error",
-        description: "Restaurant ID not found. Please log in again.",
+        description: "User or restaurant not found. Please log in again.",
         variant: "destructive",
       });
       return;
     }
-
+    setIsSubmitting(true);
     try {
+      // Generate QR code URL: /order/:restaurantId?table=:table_number
+      let qrUrl = `${window.location.origin}/order/${currentRestaurant.id}`;
+      if (data.table_number) {
+        qrUrl += `?table=${encodeURIComponent(data.table_number)}`;
+      }
       const qrCodeData: CreateQRCodeData = {
         name: data.name,
         type: data.type,
         table_number: data.table_number,
         description: data.location,
         is_active: data.is_active,
+        // Add url for QR code
+        url: qrUrl,
       };
-
       if (editingQR) {
         const updatedQR = await qrCodeService.updateQRCode(editingQR.id, qrCodeData);
         setQrCodes(prev => prev.map(qr => qr.id === editingQR.id ? updatedQR : qr));
@@ -137,14 +203,13 @@ export default function QRCodeManagement() {
           description: `${data.name} has been updated successfully.`,
         });
       } else {
-        const newQR = await qrCodeService.createQRCode(user.restaurant_id, qrCodeData);
+        const newQR = await qrCodeService.createQRCode(currentRestaurant.id, qrCodeData);
         setQrCodes(prev => [newQR, ...prev]);
         toast({
           title: "QR Code Added",
           description: `${data.name} has been added successfully.`,
         });
       }
-
       setIsAddDialogOpen(false);
       setEditingQR(null);
       form.reset();
@@ -155,6 +220,8 @@ export default function QRCodeManagement() {
         description: "Failed to save QR code. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -207,11 +274,59 @@ export default function QRCodeManagement() {
     }
   };
 
-  const handleDownload = (qr: QRCode) => {
-    // In a real app, this would generate and download the QR code image
+  const handleDownload = async (qr: QRCode) => {
+    // Get restaurant and table info
+    const restaurantName = currentRestaurant?.name || 'Restaurant';
+    const tableNumber = qr.table_number || qr.name || '';
+    const qrUrl = qr.url;
+
+    // Create a canvas
+    const size = 600;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size + 100;
+    const ctx = canvas.getContext('2d');
+
+    // Draw background (light beige)
+    ctx.fillStyle = '#fff8f0';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw a food emoji at the top
+    ctx.font = '48px serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('🍽️', size / 2, 60);
+
+    // Draw restaurant name
+    ctx.font = 'bold 32px sans-serif';
+    ctx.fillStyle = '#d35400';
+    ctx.fillText(restaurantName, size / 2, 110);
+
+    // Generate QR code and draw it
+    const qrCanvas = document.createElement('canvas');
+    await QRCodeLib.toCanvas(qrCanvas, qrUrl, { width: 360, margin: 1, color: { dark: '#222', light: '#fff8f0' } });
+    ctx.drawImage(qrCanvas, (size - 360) / 2, 140);
+
+    // Draw table number
+    ctx.font = 'bold 28px sans-serif';
+    ctx.fillStyle = '#16a085';
+    ctx.fillText(`Table: ${tableNumber}`, size / 2, size + 40);
+
+    // Draw a food border (simple icons)
+    const foodEmojis = ['🍕','🍔','🥗','🍣','🍜','🍩','🍦','🍟'];
+    ctx.font = '24px serif';
+    for (let i = 0; i < 8; i++) {
+      ctx.fillText(foodEmojis[i], 60 + i * 70, size + 80);
+    }
+
+    // Download as PNG
+    const link = document.createElement('a');
+    link.download = `${restaurantName.replace(/\s+/g, '_')}_Table_${tableNumber}_QR.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+
     toast({
-      title: "Download Started",
-      description: `QR code for ${qr.name} is being downloaded.`,
+      title: 'Download Started',
+      description: `Beautiful QR code for ${qr.name} is being downloaded.`,
     });
   };
 
@@ -352,11 +467,11 @@ export default function QRCodeManagement() {
                       control={form.control}
                       name="is_active"
                       render={({ field }) => (
-                        <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                           <div className="space-y-0.5">
-                            <FormLabel>Active</FormLabel>
-                            <div className="text-xs text-muted-foreground">
-                              Enable this QR code for scanning
+                            <FormLabel className="text-base">Active Status</FormLabel>
+                            <div className="text-sm text-muted-foreground">
+                              Enable or disable this QR code
                             </div>
                           </div>
                           <FormControl>
@@ -369,7 +484,7 @@ export default function QRCodeManagement() {
                       )}
                     />
 
-                    <div className="flex justify-end gap-2 pt-4">
+                    <div className="flex justify-end space-x-2">
                       <Button
                         type="button"
                         variant="outline"
@@ -381,17 +496,69 @@ export default function QRCodeManagement() {
                       >
                         Cancel
                       </Button>
-                      <Button type="submit">
-                        {editingQR ? "Update QR Code" : "Generate QR Code"}
+                      <Button type="submit" disabled={isSubmitting}>
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            {editingQR ? "Updating..." : "Creating..."}
+                          </>
+                        ) : (
+                          editingQR ? "Update QR Code" : "Generate QR Code"
+                        )}
                       </Button>
                     </div>
                   </form>
                 </Form>
               </DialogContent>
             </Dialog>
-            <LogoutButton variant="outline" />
+            <LogoutButton />
           </div>
         </div>
+
+        {/* Restaurant Selector */}
+        {!isLoadingRestaurants && restaurants.length > 0 && (
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Building2 className="h-5 w-5 text-muted-foreground" />
+                  <Label htmlFor="restaurant-select" className="text-sm font-medium">
+                    Select Restaurant:
+                  </Label>
+                </div>
+                <Select 
+                  value={currentRestaurant?.id || ""} 
+                  onValueChange={handleRestaurantChange}
+                >
+                  <SelectTrigger className="w-64">
+                    <SelectValue placeholder="Select a restaurant" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {restaurants.map((restaurant) => (
+                      <SelectItem key={restaurant.id} value={restaurant.id}>
+                        {restaurant.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Debug Info */}
+        {currentRestaurant && (
+          <Card className="bg-blue-50 border-blue-200">
+            <CardContent className="pt-4">
+              <p className="text-sm text-blue-700">
+                <strong>Current Restaurant:</strong> {currentRestaurant.name} (ID: {currentRestaurant.id})
+              </p>
+              <p className="text-sm text-blue-600">
+                <strong>QR Codes Found:</strong> {qrCodes.length}
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

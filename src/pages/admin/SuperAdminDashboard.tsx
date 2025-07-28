@@ -1,66 +1,60 @@
-<<<<<<< HEAD
 import { useState, useEffect } from "react";
-=======
->>>>>>> 3c5493f9f454d58d4b537e7e16805a988c12a488
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-<<<<<<< HEAD
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { AnalyticsChart } from "@/components/analytics/AnalyticsChart";
-import { analyticsService, DashboardStats, Restaurant, SystemActivity } from "@/lib/analytics";
-import { populateSampleData } from "@/lib/sampleData";
 import { AddRestaurantModal } from "@/components/admin/AddRestaurantModal";
-=======
->>>>>>> 3c5493f9f454d58d4b537e7e16805a988c12a488
+import { analyticsService, SystemAnalytics, Restaurant } from "@/lib/analytics";
+import { useAuth } from "@/contexts/AuthContext";
+import { populateSampleData } from "@/lib/sampleData";
+import { setupDatabase } from "@/lib/setupDatabase";
+import { simpleSetupDatabase } from "@/lib/simpleSetup";
+import { useToast } from "@/hooks/use-toast";
 import {
-  Building,
+  Building2,
   Users,
   DollarSign,
   TrendingUp,
   Search,
   Plus,
-  MoreVertical,
-  MapPin,
-  Star,
-  Clock,
-  AlertTriangle,
-  CheckCircle,
-<<<<<<< HEAD
   Loader2,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  Star,
+  QrCode,
+  BarChart3,
 } from "lucide-react";
 
 export default function SuperAdminDashboard() {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
-  const [stats, setStats] = useState<DashboardStats>({
-    totalRestaurants: 0,
-    totalUsers: 0,
-    totalRevenue: 0,
-    growthRate: 0
-  });
+  const [analyticsData, setAnalyticsData] = useState<SystemAnalytics | null>(null);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
-  const [activities, setActivities] = useState<SystemActivity[]>([]);
-  const [revenueData, setRevenueData] = useState<{ month: string; revenue: number }[]>([]);
-  const [orderData, setOrderData] = useState<{ month: string; orders: number }[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [addRestaurantOpen, setAddRestaurantOpen] = useState(false);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const analyticsData = await analyticsService.getAllAnalyticsData();
+        setError(null);
         
-        setStats(analyticsData.stats);
-        setRestaurants(analyticsData.restaurants);
-        setActivities(analyticsData.activities);
-        setRevenueData(analyticsData.revenueData);
-        setOrderData(analyticsData.orderData);
+        // Fetch analytics data
+        const analytics = await analyticsService.getAllAnalyticsData();
+        setAnalyticsData(analytics);
+        
+        // Fetch restaurants
+        const restaurantsData = await analyticsService.getRestaurants();
+        setRestaurants(restaurantsData);
       } catch (error) {
-        console.error('Error fetching analytics data:', error);
+        console.error('Error fetching dashboard data:', error);
+        setError('Failed to load dashboard data');
       } finally {
         setIsLoading(false);
       }
@@ -69,136 +63,39 @@ export default function SuperAdminDashboard() {
     fetchData();
   }, []);
 
-  const quickStats = [
-    { label: "Total Restaurants", value: stats.totalRestaurants, change: "+8", icon: Building, color: "text-blue-500" },
-    { label: "Total Users", value: stats.totalUsers, change: "+124", icon: Users, color: "text-green-500" },
-    { label: "Total Revenue", value: `$${stats.totalRevenue.toLocaleString()}`, change: "+12.5%", icon: DollarSign, color: "text-purple-500" },
-    { label: "Growth Rate", value: `${stats.growthRate}%`, change: "+2.1%", icon: TrendingUp, color: "text-orange-500" },
-=======
-} from "lucide-react";
-
-export default function SuperAdminDashboard() {
-  const systemData = {
-    totalRestaurants: 156,
-    totalUsers: 3420,
-    totalRevenue: 890750,
-    growthRate: 12.5,
-    restaurants: [
-      {
-        id: 1,
-        name: "Bella Vista Restaurant",
-        owner: "John Smith",
-        location: "New York, NY",
-        status: "active",
-        rating: 4.8,
-        monthlyRevenue: 45750,
-        orders: 1247,
-        joinDate: "2024-01-15",
-      },
-      {
-        id: 2,
-        name: "Golden Dragon",
-        owner: "Li Wei",
-        location: "San Francisco, CA",
-        status: "active",
-        rating: 4.6,
-        monthlyRevenue: 38920,
-        orders: 892,
-        joinDate: "2024-02-03",
-      },
-      {
-        id: 3,
-        name: "Ocean Breeze Cafe",
-        owner: "Maria Garcia",
-        location: "Miami, FL",
-        status: "pending",
-        rating: 4.4,
-        monthlyRevenue: 28340,
-        orders: 634,
-        joinDate: "2024-03-10",
-      },
-      {
-        id: 4,
-        name: "Mountain View Bistro",
-        owner: "David Johnson",
-        location: "Denver, CO",
-        status: "suspended",
-        rating: 3.9,
-        monthlyRevenue: 19850,
-        orders: 423,
-        joinDate: "2024-01-28",
-      },
-    ],
-    recentActivities: [
-      { type: "new_restaurant", message: "Ocean Breeze Cafe submitted registration", time: "2 hours ago" },
-      { type: "payment", message: "Bella Vista Restaurant paid monthly subscription", time: "5 hours ago" },
-      { type: "issue", message: "Golden Dragon reported technical issue", time: "1 day ago" },
-      { type: "milestone", message: "Mountain View Bistro reached 1000 orders", time: "2 days ago" },
-    ],
-  };
-
-  const quickStats = [
-    { label: "Total Restaurants", value: systemData.totalRestaurants, change: "+8", icon: Building, color: "text-blue-500" },
-    { label: "Total Users", value: systemData.totalUsers, change: "+124", icon: Users, color: "text-green-500" },
-    { label: "Total Revenue", value: `$${systemData.totalRevenue.toLocaleString()}`, change: "+12.5%", icon: DollarSign, color: "text-purple-500" },
-    { label: "Growth Rate", value: `${systemData.growthRate}%`, change: "+2.1%", icon: TrendingUp, color: "text-orange-500" },
->>>>>>> 3c5493f9f454d58d4b537e7e16805a988c12a488
-  ];
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "active":
-        return <Badge className="bg-green-100 text-green-800"><CheckCircle className="w-3 h-3 mr-1" />Active</Badge>;
-      case "pending":
-        return <Badge variant="outline" className="border-yellow-500 text-yellow-700"><Clock className="w-3 h-3 mr-1" />Pending</Badge>;
-      case "suspended":
-        return <Badge variant="destructive"><AlertTriangle className="w-3 h-3 mr-1" />Suspended</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
+  const handlePopulateSampleData = async () => {
+    try {
+      await populateSampleData();
+      // Refresh data after populating
+      window.location.reload();
+    } catch (error) {
+      console.error('Error populating sample data:', error);
     }
   };
 
-<<<<<<< HEAD
-  const filteredRestaurants = restaurants.filter(restaurant =>
-    restaurant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    restaurant.owner.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    restaurant.location.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const formatTimeAgo = (timestamp: string) => {
-    const now = new Date();
-    const time = new Date(timestamp);
-    const diffInHours = Math.floor((now.getTime() - time.getTime()) / (1000 * 60 * 60));
-    
-    if (diffInHours < 1) return 'Just now';
-    if (diffInHours < 24) return `${diffInHours} hours ago`;
-    const diffInDays = Math.floor(diffInHours / 24);
-    return `${diffInDays} days ago`;
-  };
-
-  const handleRestaurantAdded = () => {
-    // Refresh the data after adding a restaurant
-    const refreshData = async () => {
+  // Auto-setup database when component mounts
+  useEffect(() => {
+    const autoSetupDatabase = async () => {
       try {
-        setIsLoading(true);
-        const analyticsData = await analyticsService.getAllAnalyticsData();
-        
-        setStats(analyticsData.stats);
-        setRestaurants(analyticsData.restaurants);
-        setActivities(analyticsData.activities);
-        setRevenueData(analyticsData.revenueData);
-        setOrderData(analyticsData.orderData);
+        console.log("Auto-setting up database...");
+        await simpleSetupDatabase();
+        console.log("Database auto-setup completed");
       } catch (error) {
-        console.error('Error refreshing analytics data:', error);
-      } finally {
-        setIsLoading(false);
+        console.error('Error in auto database setup:', error);
       }
     };
 
-    refreshData();
-  };
+    // Run auto-setup after a short delay
+    const timer = setTimeout(autoSetupDatabase, 1000);
+    return () => clearTimeout(timer);
+  }, []);
 
-    if (isLoading) {
+  const filteredRestaurants = restaurants.filter(restaurant =>
+    restaurant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    restaurant.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (isLoading) {
     return (
       <AdminLayout userRole="super_admin">
         <div className="flex items-center justify-center h-64">
@@ -211,313 +108,321 @@ export default function SuperAdminDashboard() {
     );
   }
 
-=======
->>>>>>> 3c5493f9f454d58d4b537e7e16805a988c12a488
+  if (error || !analyticsData) {
+    return (
+      <AdminLayout userRole="super_admin">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <AlertCircle className="h-8 w-8 mx-auto mb-4 text-destructive" />
+            <p className="text-destructive">{error || 'No analytics data available'}</p>
+            <Button 
+              onClick={() => window.location.reload()} 
+              className="mt-4"
+              variant="outline"
+            >
+              Retry
+            </Button>
+          </div>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  const quickStats = [
+    {
+      title: "Total Restaurants",
+      value: analyticsData.totalRestaurants || 0,
+      change: analyticsData.restaurantGrowth || 0,
+      icon: Building2,
+      color: "text-blue-600",
+      bgColor: "bg-blue-50",
+    },
+    {
+      title: "Total Users",
+      value: analyticsData.totalUsers || 0,
+      change: analyticsData.userGrowth || 0,
+      icon: Users,
+      color: "text-green-600",
+      bgColor: "bg-green-50",
+    },
+    {
+      title: "Total Revenue",
+      value: `$${(analyticsData.totalRevenue || 0).toFixed(2)}`,
+      change: analyticsData.revenueGrowth || 0,
+      icon: DollarSign,
+      color: "text-purple-600",
+      bgColor: "bg-purple-50",
+    },
+    {
+      title: "Growth Rate",
+      value: `${(analyticsData.growthRate || 0).toFixed(1)}%`,
+      change: analyticsData.growthRateChange || 0,
+      icon: TrendingUp,
+      color: "text-orange-600",
+      bgColor: "bg-orange-50",
+    },
+  ];
+
   return (
     <AdminLayout userRole="super_admin">
       <div className="space-y-6">
-        {/* Welcome Section */}
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">System Overview</h2>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Super Admin Dashboard
+            </h1>
             <p className="text-muted-foreground">
-              Manage all restaurants and monitor platform performance.
+              Welcome back, {user?.email}. Here's the system overview.
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline">Export Data</Button>
-<<<<<<< HEAD
-            <Button 
-              onClick={() => {
-                console.log('Add Restaurant button clicked');
-                setAddRestaurantOpen(true);
-              }}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Restaurant
-            </Button>
             <Button 
               variant="outline" 
-              onClick={() => {
-                if (confirm('This will populate the database with sample data. Continue?')) {
-                  populateSampleData();
-                }
-              }}
+              onClick={handlePopulateSampleData}
             >
               Populate Sample Data
             </Button>
-            <LogoutButton variant="outline" />
-=======
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Restaurant
-            </Button>
->>>>>>> 3c5493f9f454d58d4b537e7e16805a988c12a488
+            <LogoutButton />
           </div>
         </div>
 
         {/* Quick Stats */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {quickStats.map((stat, index) => (
-            <Card key={index}>
+          {quickStats.map((stat) => (
+            <Card key={stat.title}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{stat.label}</CardTitle>
-                <stat.icon className={`h-4 w-4 ${stat.color}`} />
+                <CardTitle className="text-sm font-medium">
+                  {stat.title}
+                </CardTitle>
+                <div className={`p-2 rounded-lg ${stat.bgColor}`}>
+                  <stat.icon className={`h-4 w-4 ${stat.color}`} />
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{stat.value}</div>
                 <p className="text-xs text-muted-foreground">
-                  <span className="text-green-500">{stat.change}</span> from last month
+                  <span className={stat.change >= 0 ? "text-green-600" : "text-red-600"}>
+                    {stat.change >= 0 ? "+" : ""}{stat.change}%
+                  </span>{" "}
+                  from last month
                 </p>
               </CardContent>
             </Card>
           ))}
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
-          {/* Restaurant Management */}
-          <Card className="col-span-5">
+        {/* Charts and Analytics */}
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Restaurant Management</CardTitle>
-                  <CardDescription>Manage all registered restaurants</CardDescription>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div className="relative">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-<<<<<<< HEAD
-                    <Input 
-                      placeholder="Search restaurants..." 
-                      className="pl-8 w-64"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-=======
-                    <Input placeholder="Search restaurants..." className="pl-8 w-64" />
->>>>>>> 3c5493f9f454d58d4b537e7e16805a988c12a488
-                  </div>
-                </div>
-              </div>
+              <CardTitle>System Revenue</CardTitle>
+              <CardDescription>
+                Total revenue across all restaurants over the last 30 days
+              </CardDescription>
             </CardHeader>
             <CardContent>
+              <AnalyticsChart
+                data={analyticsData.revenueData || []}
+                title="Revenue"
+                color="rgb(34, 197, 94)"
+                formatValue={(value) => `$${value}`}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>System Orders</CardTitle>
+              <CardDescription>
+                Total orders across all restaurants over the last 30 days
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AnalyticsChart
+                data={analyticsData.orderData || []}
+                title="Orders"
+                color="rgb(59, 130, 246)"
+                formatValue={(value) => value.toString()}
+              />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Restaurant Management */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Restaurant Management</CardTitle>
+                <CardDescription>
+                  Manage all registered restaurants and their performance
+                </CardDescription>
+              </div>
+              <Button onClick={() => setIsAddDialogOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Restaurant
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="Search restaurants..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+
+              {/* Restaurants List */}
               <div className="space-y-4">
-<<<<<<< HEAD
-                {filteredRestaurants.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    {searchTerm ? 'No restaurants found matching your search.' : 'No restaurants found.'}
-                  </div>
-                ) : (
+                {filteredRestaurants.length > 0 ? (
                   filteredRestaurants.map((restaurant) => (
-=======
-                {systemData.restaurants.map((restaurant) => (
->>>>>>> 3c5493f9f454d58d4b537e7e16805a988c12a488
-                  <div key={restaurant.id} className="flex items-center justify-between p-4 border rounded-lg hover:shadow-sm transition-shadow">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-12 h-12 bg-gradient-primary rounded-lg flex items-center justify-center text-white font-bold">
-                        {restaurant.name.substring(0, 2).toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
+                    <div
+                      key={restaurant.id}
+                      className="flex items-center justify-between p-4 border rounded-lg"
+                    >
+                      <div className="flex items-center space-x-4">
+                        <div className="flex-shrink-0">
+                          <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                            <Building2 className="h-5 w-5 text-primary" />
+                          </div>
+                        </div>
+                        <div>
                           <p className="font-medium">{restaurant.name}</p>
-                          {getStatusBadge(restaurant.status)}
+                          <p className="text-sm text-muted-foreground">
+                            {restaurant.email}
+                          </p>
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          Owner: {restaurant.owner}
-                        </p>
-                        <div className="flex items-center text-sm text-muted-foreground">
-                          <MapPin className="w-3 h-3 mr-1" />
-                          {restaurant.location}
+                      </div>
+                      <div className="flex items-center space-x-4">
+                        <div className="text-right">
+                          <p className="text-sm text-muted-foreground">
+                            {restaurant.phone || 'No phone'}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {restaurant.address || 'No address'}
+                          </p>
                         </div>
-<<<<<<< HEAD
-                        <p className="text-xs text-muted-foreground">
-                          Joined: {new Date(restaurant.joinDate).toLocaleDateString()}
-                        </p>
-=======
->>>>>>> 3c5493f9f454d58d4b537e7e16805a988c12a488
+                        <Badge variant={restaurant.is_active ? "default" : "secondary"}>
+                          {restaurant.is_active ? "Active" : "Inactive"}
+                        </Badge>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-6">
-                      <div className="text-center">
-                        <p className="text-sm font-medium">${restaurant.monthlyRevenue.toLocaleString()}</p>
-                        <p className="text-xs text-muted-foreground">Monthly Revenue</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-sm font-medium">{restaurant.orders}</p>
-                        <p className="text-xs text-muted-foreground">Total Orders</p>
-                      </div>
-                      <div className="text-center">
-                        <div className="flex items-center">
-                          <Star className="w-3 h-3 text-yellow-500 mr-1" />
-                          <p className="text-sm font-medium">{restaurant.rating}</p>
-                        </div>
-                        <p className="text-xs text-muted-foreground">Rating</p>
-                      </div>
-                      <Button variant="ghost" size="icon">
-                        <MoreVertical className="w-4 h-4" />
-                      </Button>
-                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8">
+                    <Building2 className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-muted-foreground">
+                      {searchTerm ? "No restaurants found matching your search." : "No restaurants registered yet."}
+                    </p>
                   </div>
-<<<<<<< HEAD
-                )))}
-=======
-                ))}
->>>>>>> 3c5493f9f454d58d4b537e7e16805a988c12a488
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* System Analytics */}
+        <div className="grid gap-6 md:grid-cols-3">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Platform Performance
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Active Restaurants</span>
+                <span className="font-medium">
+                  {analyticsData.activeRestaurants || 0}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Total Orders</span>
+                <span className="font-medium">
+                  {analyticsData.totalOrders || 0}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Avg. Order Value</span>
+                <span className="font-medium">
+                  ${(analyticsData.averageOrderValue || 0).toFixed(2)}
+                </span>
               </div>
             </CardContent>
           </Card>
 
-          {/* Recent Activities */}
-          <Card className="col-span-2">
+          <Card>
             <CardHeader>
-              <CardTitle>Recent Activities</CardTitle>
-              <CardDescription>Latest system events</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                User Analytics
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-<<<<<<< HEAD
-              {activities.length === 0 ? (
-                <div className="text-center py-4 text-muted-foreground">
-                  No recent activities
-                </div>
-              ) : (
-                activities.map((activity, index) => (
-                  <div key={activity.id} className="flex items-start space-x-3">
-                    <div className={`w-2 h-2 rounded-full mt-2 ${
-                      activity.type === "new_restaurant" ? "bg-blue-500" :
-                      activity.type === "payment" ? "bg-green-500" :
-                      activity.type === "issue" ? "bg-red-500" : 
-                      activity.type === "order" ? "bg-purple-500" : "bg-gray-500"
-                    }`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm">{activity.message}</p>
-                      <p className="text-xs text-muted-foreground">{formatTimeAgo(activity.timestamp)}</p>
-                    </div>
-                  </div>
-                ))
-              )}
-=======
-              {systemData.recentActivities.map((activity, index) => (
-                <div key={index} className="flex items-start space-x-3">
-                  <div className={`w-2 h-2 rounded-full mt-2 ${
-                    activity.type === "new_restaurant" ? "bg-blue-500" :
-                    activity.type === "payment" ? "bg-green-500" :
-                    activity.type === "issue" ? "bg-red-500" : "bg-purple-500"
-                  }`} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm">{activity.message}</p>
-                    <p className="text-xs text-muted-foreground">{activity.time}</p>
-                  </div>
-                </div>
-              ))}
->>>>>>> 3c5493f9f454d58d4b537e7e16805a988c12a488
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Total Customers</span>
+                <span className="font-medium">
+                  {analyticsData.totalCustomers || 0}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">New This Month</span>
+                <span className="font-medium">
+                  {analyticsData.newCustomers || 0}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Active Users</span>
+                <span className="font-medium">
+                  {analyticsData.activeUsers || 0}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Star className="h-5 w-5" />
+                Quality Metrics
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Avg. Rating</span>
+                <span className="font-medium">
+                  {(analyticsData.averageRating || 0).toFixed(1)}/5
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Response Time</span>
+                <span className="font-medium">
+                  {analyticsData.avgResponseTime || 0} min
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Satisfaction</span>
+                <span className="font-medium">
+                  {(analyticsData.customerSatisfaction || 0).toFixed(1)}%
+                </span>
+              </div>
             </CardContent>
           </Card>
         </div>
-
-<<<<<<< HEAD
-        {/* Analytics Charts */}
-        <div className="grid gap-6 md:grid-cols-2">
-          <AnalyticsChart
-            title="Revenue Analytics"
-            description="Monthly revenue trends"
-            data={revenueData.map(item => ({ month: item.month, value: item.revenue }))}
-            valueKey="revenue"
-            color="#8b5cf6"
-            formatValue={(value) => `$${value.toLocaleString()}`}
-          />
-          
-          <AnalyticsChart
-            title="Order Analytics"
-            description="Monthly order trends"
-            data={orderData.map(item => ({ month: item.month, value: item.orders }))}
-            valueKey="orders"
-            color="#06b6d4"
-            formatValue={(value) => value.toString()}
-          />
-        </div>
-
-=======
->>>>>>> 3c5493f9f454d58d4b537e7e16805a988c12a488
-        {/* System Analytics */}
-        <Card>
-          <CardHeader>
-            <CardTitle>System Analytics</CardTitle>
-            <CardDescription>Platform performance and usage statistics</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="overview" className="w-full">
-              <TabsList>
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="revenue">Revenue</TabsTrigger>
-                <TabsTrigger value="users">Users</TabsTrigger>
-                <TabsTrigger value="performance">Performance</TabsTrigger>
-              </TabsList>
-              <TabsContent value="overview" className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-4">
-                  <div className="text-center p-4 border rounded-lg">
-<<<<<<< HEAD
-                    <div className="text-2xl font-bold text-blue-500">{stats.totalRestaurants}</div>
-                    <p className="text-sm text-muted-foreground">Total Restaurants</p>
-                  </div>
-                  <div className="text-center p-4 border rounded-lg">
-                    <div className="text-2xl font-bold text-green-500">{stats.totalUsers}</div>
-                    <p className="text-sm text-muted-foreground">Total Users</p>
-                  </div>
-                  <div className="text-center p-4 border rounded-lg">
-                    <div className="text-2xl font-bold text-purple-500">${(stats.totalRevenue / 1000).toFixed(1)}K</div>
-                    <p className="text-sm text-muted-foreground">Total Revenue</p>
-                  </div>
-                  <div className="text-center p-4 border rounded-lg">
-                    <div className="text-2xl font-bold text-orange-500">{stats.growthRate}%</div>
-                    <p className="text-sm text-muted-foreground">Growth Rate</p>
-=======
-                    <div className="text-2xl font-bold text-blue-500">156</div>
-                    <p className="text-sm text-muted-foreground">Total Restaurants</p>
-                  </div>
-                  <div className="text-center p-4 border rounded-lg">
-                    <div className="text-2xl font-bold text-green-500">3,420</div>
-                    <p className="text-sm text-muted-foreground">Total Users</p>
-                  </div>
-                  <div className="text-center p-4 border rounded-lg">
-                    <div className="text-2xl font-bold text-purple-500">$890K</div>
-                    <p className="text-sm text-muted-foreground">Total Revenue</p>
-                  </div>
-                  <div className="text-center p-4 border rounded-lg">
-                    <div className="text-2xl font-bold text-orange-500">98.5%</div>
-                    <p className="text-sm text-muted-foreground">System Uptime</p>
->>>>>>> 3c5493f9f454d58d4b537e7e16805a988c12a488
-                  </div>
-                </div>
-              </TabsContent>
-              <TabsContent value="revenue">
-                <div className="text-center py-8 text-muted-foreground">
-                  Revenue analytics charts would be displayed here
-                </div>
-              </TabsContent>
-              <TabsContent value="users">
-                <div className="text-center py-8 text-muted-foreground">
-                  User analytics and demographics would be displayed here
-                </div>
-              </TabsContent>
-              <TabsContent value="performance">
-                <div className="text-center py-8 text-muted-foreground">
-                  System performance metrics would be displayed here
-                </div>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
       </div>
-<<<<<<< HEAD
 
       {/* Add Restaurant Modal */}
       <AddRestaurantModal
-        open={addRestaurantOpen}
-        onOpenChange={setAddRestaurantOpen}
-        onRestaurantAdded={handleRestaurantAdded}
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
       />
-=======
->>>>>>> 3c5493f9f454d58d4b537e7e16805a988c12a488
     </AdminLayout>
   );
 }

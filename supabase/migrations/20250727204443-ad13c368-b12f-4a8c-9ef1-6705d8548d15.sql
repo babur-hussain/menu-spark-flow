@@ -13,7 +13,8 @@ CREATE TABLE public.restaurants (
   is_active BOOLEAN NOT NULL DEFAULT true,
   qr_code_url TEXT,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  UNIQUE(user_id, name)
 );
 
 -- Create menu categories table
@@ -75,12 +76,44 @@ CREATE TABLE public.order_items (
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 
+-- Create QR codes table
+CREATE TABLE public.qr_codes (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  restaurant_id UUID NOT NULL REFERENCES public.restaurants(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'table', -- table, takeaway, delivery, custom
+  code TEXT NOT NULL UNIQUE,
+  url TEXT NOT NULL,
+  table_number TEXT,
+  description TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  scan_count INTEGER NOT NULL DEFAULT 0,
+  last_scanned TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
+-- Create reviews table
+CREATE TABLE public.reviews (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  restaurant_id UUID NOT NULL REFERENCES public.restaurants(id) ON DELETE CASCADE,
+  customer_name TEXT,
+  customer_email TEXT,
+  rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  comment TEXT,
+  is_approved BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
 -- Enable Row Level Security
 ALTER TABLE public.restaurants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.menu_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.menu_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.qr_codes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
 
 -- Create policies for restaurants (restaurant owners can manage their own restaurants)
 CREATE POLICY "Restaurant owners can view their own restaurants" 
@@ -170,6 +203,39 @@ ON public.order_items
 FOR INSERT 
 WITH CHECK (true);
 
+-- Create policies for QR codes
+CREATE POLICY "Restaurant owners can manage their QR codes" 
+ON public.qr_codes 
+FOR ALL 
+USING (EXISTS (
+  SELECT 1 FROM public.restaurants 
+  WHERE id = restaurant_id AND user_id = auth.uid()
+));
+
+CREATE POLICY "Anyone can view active QR codes" 
+ON public.qr_codes 
+FOR SELECT 
+USING (is_active = true);
+
+-- Create policies for reviews
+CREATE POLICY "Restaurant owners can manage their reviews" 
+ON public.reviews 
+FOR ALL 
+USING (EXISTS (
+  SELECT 1 FROM public.restaurants 
+  WHERE id = restaurant_id AND user_id = auth.uid()
+));
+
+CREATE POLICY "Anyone can view approved reviews" 
+ON public.reviews 
+FOR SELECT 
+USING (is_approved = true);
+
+CREATE POLICY "Anyone can create reviews" 
+ON public.reviews 
+FOR INSERT 
+WITH CHECK (true);
+
 -- Create function to update timestamps
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -197,6 +263,16 @@ EXECUTE FUNCTION public.update_updated_at_column();
 
 CREATE TRIGGER update_orders_updated_at
 BEFORE UPDATE ON public.orders
+FOR EACH ROW
+EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE TRIGGER update_qr_codes_updated_at
+BEFORE UPDATE ON public.qr_codes
+FOR EACH ROW
+EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE TRIGGER update_reviews_updated_at
+BEFORE UPDATE ON public.reviews
 FOR EACH ROW
 EXECUTE FUNCTION public.update_updated_at_column();
 

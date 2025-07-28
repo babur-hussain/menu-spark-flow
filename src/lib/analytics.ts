@@ -103,10 +103,7 @@ class AnalyticsService {
     try {
       const { data: restaurants, error } = await supabase
         .from('restaurants')
-        .select(`
-          *,
-          user_profiles!restaurants_user_id_fkey(email)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) {

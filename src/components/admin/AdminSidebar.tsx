@@ -33,6 +33,9 @@ export function AdminSidebar({ userRole }: AdminSidebarProps) {
   const { open: sidebarOpen } = useSidebar();
   const location = useLocation();
   const currentPath = location.pathname;
+  
+  // Force sidebar to be open for Super Admin users
+  const isSidebarOpen = userRole === "super_admin" ? true : sidebarOpen;
 
   const isActive = (path: string) => currentPath === path;
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
@@ -61,8 +64,8 @@ export function AdminSidebar({ userRole }: AdminSidebarProps) {
   const isExpanded = items.some((i) => isActive(i.url));
 
   return (
-    <Sidebar className={!sidebarOpen ? "w-14" : "w-60"}>
-      <SidebarContent>
+    <Sidebar className={!isSidebarOpen ? "w-14" : "w-60"}>
+      <SidebarContent className="h-full">
         <SidebarGroup>
           <SidebarGroupLabel>
             {userRole === "super_admin" ? "System Management" : "Restaurant Management"}
@@ -74,7 +77,7 @@ export function AdminSidebar({ userRole }: AdminSidebarProps) {
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} className={getNavCls}>
                       <item.icon className="mr-2 h-4 w-4" />
-                      {sidebarOpen && <span>{item.title}</span>}
+                      {isSidebarOpen && <span>{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

@@ -45,18 +45,15 @@ export const qrCodeService = {
     }
   },
 
-  async createQRCode(restaurantId: string, qrCodeData: CreateQRCodeData): Promise<QRCode> {
+  async createQRCode(restaurantId: string, qrCodeData: CreateQRCodeData & { url: string }): Promise<QRCode> {
     try {
       // Generate unique code
       const code = `QR-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const url = `${window.location.origin}/menu?qr=${code}`;
-
       const { data, error } = await supabase
         .from('qr_codes')
         .insert([{
           ...qrCodeData,
           code,
-          url,
           restaurant_id: restaurantId,
           scan_count: 0,
         }])
@@ -75,7 +72,7 @@ export const qrCodeService = {
     }
   },
 
-  async updateQRCode(id: string, updates: Partial<CreateQRCodeData>): Promise<QRCode> {
+  async updateQRCode(id: string, updates: Partial<CreateQRCodeData> & { url?: string }): Promise<QRCode> {
     try {
       const { data, error } = await supabase
         .from('qr_codes')

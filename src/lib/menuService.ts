@@ -5,7 +5,7 @@ export interface MenuItem {
   name: string;
   description: string;
   price: number;
-  category: string;
+  category: string; // We'll map category_id to category name
   preparation_time: number;
   calories?: number;
   allergens?: string[];
@@ -37,9 +37,15 @@ export interface CreateMenuItemData {
 export const menuService = {
   async getMenuItems(restaurantId: string): Promise<MenuItem[]> {
     try {
+      // First, get or create default categories for the restaurant
+      await this.ensureDefaultCategories(restaurantId);
+      
       const { data, error } = await supabase
         .from('menu_items')
-        .select('*')
+        .select(`
+          *,
+          menu_categories!inner(name)
+        `)
         .eq('restaurant_id', restaurantId)
         .order('created_at', { ascending: false });
 
@@ -48,22 +54,108 @@ export const menuService = {
         throw error;
       }
 
-      return data || [];
+      // Transform the data to match our interface
+      return (data || []).map(item => ({
+        ...item,
+        category: item.menu_categories?.name || 'Uncategorized',
+        is_vegetarian: item.dietary_info?.includes('vegetarian') || false,
+        is_vegan: item.dietary_info?.includes('vegan') || false,
+        is_gluten_free: item.dietary_info?.includes('gluten_free') || false,
+        calories: undefined, // Not in DB schema
+      }));
     } catch (error) {
       console.error('Error in getMenuItems:', error);
       throw error;
     }
   },
 
+  async ensureDefaultCategories(restaurantId: string): Promise<void> {
+    const defaultCategories = [
+      'Appetizers',
+      'Main Course', 
+      'Desserts',
+      'Beverages',
+      'Salads',
+      'Soups',
+      'Pasta',
+      'Pizza',
+      'Burgers',
+      'Seafood',
+      'Grill',
+      'Kids Menu'
+    ];
+
+    for (const categoryName of defaultCategories) {
+      const { data: existing } = await supabase
+        .from('menu_categories')
+        .select('id')
+        .eq('restaurant_id', restaurantId)
+        .eq('name', categoryName)
+        .single();
+
+      if (!existing) {
+        await supabase
+          .from('menu_categories')
+          .insert({
+            restaurant_id: restaurantId,
+            name: categoryName,
+            description: `${categoryName} items`,
+            sort_order: defaultCategories.indexOf(categoryName)
+          });
+      }
+    }
+  },
+
+  async getCategories(restaurantId: string): Promise<{ id: string; name: string }[]> {
+    try {
+      const { data, error } = await supabase
+        .from('menu_categories')
+        .select('id, name')
+        .eq('restaurant_id', restaurantId)
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching categories:', error);
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getCategories:', error);
+      throw error;
+    }
+  },
+
   async createMenuItem(restaurantId: string, menuItem: CreateMenuItemData): Promise<MenuItem> {
     try {
+      // Get or create the category
+      let categoryId = await this.getOrCreateCategory(restaurantId, menuItem.category);
+      
+      // Convert dietary info
+      const dietaryInfo = [];
+      if (menuItem.is_vegetarian) dietaryInfo.push('vegetarian');
+      if (menuItem.is_vegan) dietaryInfo.push('vegan');
+      if (menuItem.is_gluten_free) dietaryInfo.push('gluten_free');
+
       const { data, error } = await supabase
         .from('menu_items')
         .insert([{
-          ...menuItem,
           restaurant_id: restaurantId,
+          category_id: categoryId,
+          name: menuItem.name,
+          description: menuItem.description,
+          price: menuItem.price,
+          preparation_time: menuItem.preparation_time,
+          image_url: menuItem.image_url,
+          is_available: menuItem.is_available,
+          dietary_info: dietaryInfo,
+          allergens: menuItem.allergens || [],
         }])
-        .select()
+        .select(`
+          *,
+          menu_categories!inner(name)
+        `)
         .single();
 
       if (error) {
@@ -71,23 +163,102 @@ export const menuService = {
         throw error;
       }
 
-      return data;
+      return {
+        ...data,
+        category: data.menu_categories?.name || 'Uncategorized',
+        is_vegetarian: data.dietary_info?.includes('vegetarian') || false,
+        is_vegan: data.dietary_info?.includes('vegan') || false,
+        is_gluten_free: data.dietary_info?.includes('gluten_free') || false,
+        calories: undefined,
+      };
     } catch (error) {
       console.error('Error in createMenuItem:', error);
       throw error;
     }
   },
 
+  async getOrCreateCategory(restaurantId: string, categoryName: string): Promise<string> {
+    // Try to find existing category
+    const { data: existing } = await supabase
+      .from('menu_categories')
+      .select('id')
+      .eq('restaurant_id', restaurantId)
+      .eq('name', categoryName)
+      .single();
+
+    if (existing) {
+      return existing.id;
+    }
+
+    // Create new category
+    const { data: newCategory, error } = await supabase
+      .from('menu_categories')
+      .insert({
+        restaurant_id: restaurantId,
+        name: categoryName,
+        description: `${categoryName} items`,
+        sort_order: 999
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('Error creating category:', error);
+      throw error;
+    }
+
+    return newCategory.id;
+  },
+
   async updateMenuItem(id: string, updates: Partial<CreateMenuItemData>): Promise<MenuItem> {
     try {
+      let categoryId: string | undefined;
+      
+      if (updates.category) {
+        // Get the restaurant_id for this menu item
+        const { data: currentItem } = await supabase
+          .from('menu_items')
+          .select('restaurant_id')
+          .eq('id', id)
+          .single();
+
+        if (currentItem) {
+          categoryId = await this.getOrCreateCategory(currentItem.restaurant_id, updates.category);
+        }
+      }
+
+      // Convert dietary info
+      const dietaryInfo = [];
+      if (updates.is_vegetarian) dietaryInfo.push('vegetarian');
+      if (updates.is_vegan) dietaryInfo.push('vegan');
+      if (updates.is_gluten_free) dietaryInfo.push('gluten_free');
+
+      const updateData: any = {
+        ...updates,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (categoryId) {
+        updateData.category_id = categoryId;
+        delete updateData.category;
+      }
+
+      if (dietaryInfo.length > 0) {
+        updateData.dietary_info = dietaryInfo;
+      }
+
+      delete updateData.is_vegetarian;
+      delete updateData.is_vegan;
+      delete updateData.is_gluten_free;
+
       const { data, error } = await supabase
         .from('menu_items')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('id', id)
-        .select()
+        .select(`
+          *,
+          menu_categories!inner(name)
+        `)
         .single();
 
       if (error) {
@@ -95,7 +266,14 @@ export const menuService = {
         throw error;
       }
 
-      return data;
+      return {
+        ...data,
+        category: data.menu_categories?.name || 'Uncategorized',
+        is_vegetarian: data.dietary_info?.includes('vegetarian') || false,
+        is_vegan: data.dietary_info?.includes('vegan') || false,
+        is_gluten_free: data.dietary_info?.includes('gluten_free') || false,
+        calories: undefined,
+      };
     } catch (error) {
       console.error('Error in updateMenuItem:', error);
       throw error;
@@ -128,7 +306,10 @@ export const menuService = {
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)
-        .select()
+        .select(`
+          *,
+          menu_categories!inner(name)
+        `)
         .single();
 
       if (error) {
@@ -136,7 +317,14 @@ export const menuService = {
         throw error;
       }
 
-      return data;
+      return {
+        ...data,
+        category: data.menu_categories?.name || 'Uncategorized',
+        is_vegetarian: data.dietary_info?.includes('vegetarian') || false,
+        is_vegan: data.dietary_info?.includes('vegan') || false,
+        is_gluten_free: data.dietary_info?.includes('gluten_free') || false,
+        calories: undefined,
+      };
     } catch (error) {
       console.error('Error in toggleMenuItemAvailability:', error);
       throw error;

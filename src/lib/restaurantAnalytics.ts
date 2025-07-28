@@ -91,7 +91,7 @@ class RestaurantAnalyticsService {
     }
   }
 
-  private calculateRestaurantStats(restaurant: any, orders: any[]): RestaurantStats {
+  private calculateRestaurantStats(restaurant: Record<string, unknown>, orders: Record<string, unknown>[]): RestaurantStats {
     const totalOrders = orders.length;
     const totalRevenue = orders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
     
@@ -133,7 +133,7 @@ class RestaurantAnalyticsService {
     };
   }
 
-  private getRecentOrders(orders: any[]): RestaurantOrder[] {
+  private getRecentOrders(orders: Record<string, unknown>[]): RestaurantOrder[] {
     return orders.slice(0, 10).map(order => ({
       id: order.id,
       customer_name: order.customer_name,
@@ -150,7 +150,7 @@ class RestaurantAnalyticsService {
     }));
   }
 
-  private calculateDailyStats(orders: any[]): { date: string; orders: number; revenue: number }[] {
+  private calculateDailyStats(orders: Record<string, unknown>[]): { date: string; orders: number; revenue: number }[] {
     const dailyStats: { [key: string]: { orders: number; revenue: number } } = {};
     
     orders.forEach(order => {
@@ -172,7 +172,7 @@ class RestaurantAnalyticsService {
       .slice(-7); // Last 7 days
   }
 
-  private calculateWeeklyStats(orders: any[]): { week: string; orders: number; revenue: number }[] {
+  private calculateWeeklyStats(orders: Record<string, unknown>[]): { week: string; orders: number; revenue: number }[] {
     const weeklyStats: { [key: string]: { orders: number; revenue: number } } = {};
     
     orders.forEach(order => {
@@ -198,7 +198,7 @@ class RestaurantAnalyticsService {
       .slice(-4); // Last 4 weeks
   }
 
-  private calculateMonthlyStats(orders: any[]): { month: string; orders: number; revenue: number }[] {
+  private calculateMonthlyStats(orders: Record<string, unknown>[]): { month: string; orders: number; revenue: number }[] {
     const monthlyStats: { [key: string]: { orders: number; revenue: number } } = {};
     
     orders.forEach(order => {

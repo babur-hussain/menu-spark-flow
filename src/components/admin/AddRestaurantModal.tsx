@@ -72,7 +72,7 @@ export function AddRestaurantModal({ open, onOpenChange, onRestaurantAdded }: Ad
     }
 
     // Validate phone format (basic validation)
-    if (formData.phone && !/^[\+]?[1-9][\d]{0,15}$/.test(formData.phone.replace(/[\s\-\(\)]/g, ''))) {
+    if (formData.phone && !/^[+]?[1-9][\d]{0,15}$/.test(formData.phone.replace(/[\s\-()]/g, ''))) {
       toast({
         title: "Invalid Phone",
         description: "Please enter a valid phone number.",

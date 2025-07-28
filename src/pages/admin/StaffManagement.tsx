@@ -32,7 +32,8 @@ import {
   Settings,
   Shield,
   ChefHat,
-  UtensilsCrossed
+  UtensilsCrossed,
+  DollarSign
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AdminLayout } from "@/components/admin/AdminLayout";
