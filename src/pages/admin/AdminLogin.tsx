@@ -1,5 +1,9 @@
 import { useState } from "react";
+<<<<<<< HEAD
 import { useNavigate, Link } from "react-router-dom";
+=======
+import { useNavigate } from "react-router-dom";
+>>>>>>> 3c5493f9f454d58d4b537e7e16805a988c12a488
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,10 +13,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+<<<<<<< HEAD
 import { QrCode, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { DEFAULT_ADMIN_CREDENTIALS, DEFAULT_RESTAURANT_CREDENTIALS, authService } from "@/lib/auth";
+=======
+import { QrCode, ArrowLeft } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+>>>>>>> 3c5493f9f454d58d4b537e7e16805a988c12a488
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -25,9 +34,13 @@ type LoginFormData = z.infer<typeof loginSchema>;
 export default function AdminLogin() {
   const navigate = useNavigate();
   const { toast } = useToast();
+<<<<<<< HEAD
   const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+=======
+  const [isLoading, setIsLoading] = useState(false);
+>>>>>>> 3c5493f9f454d58d4b537e7e16805a988c12a488
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -41,6 +54,7 @@ export default function AdminLogin() {
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     
+<<<<<<< HEAD
     try {
       const result = await login(data);
       
@@ -90,6 +104,24 @@ export default function AdminLogin() {
     } finally {
       setIsLoading(false);
     }
+=======
+    // Mock authentication - replace with real authentication
+    setTimeout(() => {
+      toast({
+        title: "Login Successful",
+        description: `Welcome back! Redirecting to your ${data.role === "super_admin" ? "super admin" : "restaurant"} dashboard.`,
+      });
+      
+      // Redirect based on role
+      if (data.role === "super_admin") {
+        navigate("/admin/overview");
+      } else {
+        navigate("/admin/dashboard");
+      }
+      
+      setIsLoading(false);
+    }, 1500);
+>>>>>>> 3c5493f9f454d58d4b537e7e16805a988c12a488
   };
 
   return (
@@ -147,7 +179,10 @@ export default function AdminLogin() {
                         <Input 
                           type="email" 
                           placeholder="admin@restaurant.com" 
+<<<<<<< HEAD
                           autoComplete="email"
+=======
+>>>>>>> 3c5493f9f454d58d4b537e7e16805a988c12a488
                           {...field} 
                         />
                       </FormControl>
@@ -163,6 +198,7 @@ export default function AdminLogin() {
                     <FormItem>
                       <FormLabel>Password</FormLabel>
                       <FormControl>
+<<<<<<< HEAD
                         <div className="relative">
                           <Input 
                             type={showPassword ? "text" : "password"}
@@ -184,6 +220,13 @@ export default function AdminLogin() {
                             )}
                           </Button>
                         </div>
+=======
+                        <Input 
+                          type="password" 
+                          placeholder="Enter your password" 
+                          {...field} 
+                        />
+>>>>>>> 3c5493f9f454d58d4b537e7e16805a988c12a488
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -200,6 +243,7 @@ export default function AdminLogin() {
               </form>
             </Form>
 
+<<<<<<< HEAD
             <div className="mt-6 text-center space-y-2">
               <p className="text-sm text-muted-foreground">
                 Don't have an account?{" "}
@@ -207,6 +251,9 @@ export default function AdminLogin() {
                   Register here
                 </Link>
               </p>
+=======
+            <div className="mt-6 text-center">
+>>>>>>> 3c5493f9f454d58d4b537e7e16805a988c12a488
               <Button 
                 variant="link" 
                 onClick={() => navigate("/")}
@@ -216,6 +263,7 @@ export default function AdminLogin() {
                 Back to Website
               </Button>
             </div>
+<<<<<<< HEAD
             
             {/* Email Confirmation Help */}
             <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
@@ -297,6 +345,8 @@ export default function AdminLogin() {
                 </Button>
               )}
             </div>
+=======
+>>>>>>> 3c5493f9f454d58d4b537e7e16805a988c12a488
           </CardContent>
         </Card>
 
@@ -308,6 +358,7 @@ export default function AdminLogin() {
           <CardContent className="space-y-2 text-sm">
             <div>
               <p className="font-medium">Restaurant Manager:</p>
+<<<<<<< HEAD
               <p className="text-muted-foreground">
                 {DEFAULT_RESTAURANT_CREDENTIALS.email} / {DEFAULT_RESTAURANT_CREDENTIALS.password}
               </p>
@@ -317,6 +368,13 @@ export default function AdminLogin() {
               <p className="text-muted-foreground">
                 {DEFAULT_ADMIN_CREDENTIALS.email} / {DEFAULT_ADMIN_CREDENTIALS.password}
               </p>
+=======
+              <p className="text-muted-foreground">manager@demo.com / password123</p>
+            </div>
+            <div>
+              <p className="font-medium">Super Admin:</p>
+              <p className="text-muted-foreground">admin@demo.com / admin123</p>
+>>>>>>> 3c5493f9f454d58d4b537e7e16805a988c12a488
             </div>
           </CardContent>
         </Card>

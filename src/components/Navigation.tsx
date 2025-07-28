@@ -1,12 +1,18 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { QrCode, Menu, X, ChefHat, Users, BarChart3 } from "lucide-react";
+<<<<<<< HEAD
 import { useAuth } from "@/contexts/AuthContext";
 import { ProfileDropdown } from "@/components/auth/ProfileDropdown";
 
 const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { user, isAuthenticated } = useAuth();
+=======
+
+const Navigation = () => {
+  const [isOpen, setIsOpen] = useState(false);
+>>>>>>> 3c5493f9f454d58d4b537e7e16805a988c12a488
 
   const navItems = [
     { name: "Features", href: "#features", icon: ChefHat },
@@ -42,6 +48,7 @@ const Navigation = () => {
                 {item.name}
               </a>
             ))}
+<<<<<<< HEAD
             
             {isAuthenticated ? (
               <ProfileDropdown />
@@ -62,6 +69,21 @@ const Navigation = () => {
                 </Button>
               </>
             )}
+=======
+            <Button 
+              variant="outline"
+              onClick={() => window.location.href = '/admin/login'}
+            >
+              Admin Login
+            </Button>
+            <Button 
+              variant="hero" 
+              size="lg"
+              onClick={() => window.location.href = '/restaurant-registration'}
+            >
+              Get Started
+            </Button>
+>>>>>>> 3c5493f9f454d58d4b537e7e16805a988c12a488
           </div>
 
           {/* Mobile menu button */}
@@ -96,6 +118,7 @@ const Navigation = () => {
                 </a>
               ))}
               <div className="px-3 py-2 space-y-2">
+<<<<<<< HEAD
                 {isAuthenticated ? (
                   <div className="space-y-2">
                     <div className="px-3 py-2 border rounded-lg">
@@ -154,6 +177,30 @@ const Navigation = () => {
                     </Button>
                   </>
                 )}
+=======
+                <Button 
+                  variant="outline" 
+                  size="lg" 
+                  className="w-full"
+                  onClick={() => {
+                    setIsOpen(false);
+                    window.location.href = '/admin/login';
+                  }}
+                >
+                  Admin Login
+                </Button>
+                <Button 
+                  variant="hero" 
+                  size="lg" 
+                  className="w-full"
+                  onClick={() => {
+                    setIsOpen(false);
+                    window.location.href = '/restaurant-registration';
+                  }}
+                >
+                  Get Started
+                </Button>
+>>>>>>> 3c5493f9f454d58d4b537e7e16805a988c12a488
               </div>
             </div>
           </div>
