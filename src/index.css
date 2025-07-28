@@ -21,7 +21,7 @@ All colors MUST be HSL for consistency and theming.
     --popover-foreground: 222.2 84% 4.9%;
 
     /* Primary - Electric Orange (appetite-stimulating) */
-    --primary: 222.2 47.4% 11.2%;
+    --primary: 221.2 83.2% 53.3%;
     --primary-foreground: 210 40% 98%;
     --primary-hover: 15 100% 50%;
 
@@ -59,7 +59,7 @@ All colors MUST be HSL for consistency and theming.
     /* Form elements */
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --ring: 221.2 83.2% 53.3%;
 
     /* Stunning Food-themed gradients */
     --gradient-primary: linear-gradient(135deg, hsl(15 100% 55%), hsl(348 100% 62%), hsl(25 100% 58%));
@@ -117,8 +117,8 @@ All colors MUST be HSL for consistency and theming.
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 84% 4.9%;
     --primary-hover: 15 100% 50%;
 
     --secondary: 217.2 32.6% 17.5%;
@@ -141,7 +141,7 @@ All colors MUST be HSL for consistency and theming.
 
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --ring: 224.3 76.3% 94.1%;
 
     /* Vibrant Dark mode gradients */
     --gradient-primary: linear-gradient(135deg, hsl(15 100% 55%), hsl(348 100% 62%), hsl(25 100% 58%));
@@ -221,7 +221,7 @@ All colors MUST be HSL for consistency and theming.
 
 /* Gradient text */
 .gradient-text {
-  background: linear-gradient(135deg, #f97316, #ef4444);
+  background: linear-gradient(135deg, hsl(15 100% 55%), hsl(348 100% 62%), hsl(25 100% 58%));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -457,4 +457,74 @@ All colors MUST be HSL for consistency and theming.
     z-index: -1;
     animation: gradient-shift 3s ease infinite;
   }
+}
+
+/* Dark mode specific gradients */
+.dark .bg-gradient-to-br {
+  background: linear-gradient(to bottom right, hsl(222 84% 4.9%), hsl(217 32% 17.5%), hsl(215 25% 27%));
+}
+
+.dark .bg-gradient-to-r {
+  background: linear-gradient(to right, hsl(222 84% 4.9%), hsl(217 32% 17.5%));
+}
+
+/* Dark mode text colors */
+.dark .text-gray-700 {
+  color: hsl(210 40% 98%);
+}
+
+.dark .text-gray-600 {
+  color: hsl(215 20% 65%);
+}
+
+.dark .text-gray-500 {
+  color: hsl(215 16% 47%);
+}
+
+.dark .text-gray-400 {
+  color: hsl(215 16% 47%);
+}
+
+/* Dark mode background colors */
+.dark .bg-white {
+  background-color: hsl(222 84% 4.9%);
+}
+
+.dark .bg-gray-50 {
+  background-color: hsl(217 32% 17.5%);
+}
+
+.dark .bg-gray-100 {
+  background-color: hsl(217 32% 17.5%);
+}
+
+/* Dark mode border colors */
+.dark .border-gray-200 {
+  border-color: hsl(217 32% 17.5%);
+}
+
+.dark .border-gray-300 {
+  border-color: hsl(215 20% 65%);
+}
+
+/* Dark mode hover states */
+.dark .hover\:bg-gray-50:hover {
+  background-color: hsl(215 25% 27%);
+}
+
+.dark .hover\:bg-gray-100:hover {
+  background-color: hsl(215 25% 27%);
+}
+
+/* Dark mode shadow adjustments */
+.dark .shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+}
+
+.dark .shadow-xl {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+}
+
+.dark .shadow-2xl {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
 }

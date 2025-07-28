@@ -12,11 +12,12 @@ import Order from "./pages/Order";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminRegister from "./pages/admin/AdminRegister";
 import AdminProfile from "./pages/admin/AdminProfile";
-import RestaurantDashboard from "./pages/admin/RestaurantDashboard";
+import RestaurantDashboardWrapper from "./pages/admin/RestaurantDashboardWrapper";
 import SuperAdminDashboard from "./pages/admin/SuperAdminDashboard";
 import MenuManagement from "./pages/admin/MenuManagement";
 import QRCodeManagement from "./pages/admin/QRCodeManagement";
 import OrderManagement from "./pages/admin/OrderManagement";
+import OrderHistory from "./pages/admin/OrderHistory";
 import StaffManagement from "./pages/admin/StaffManagement";
 import Analytics from "./pages/admin/Analytics";
 import Reviews from "./pages/admin/Reviews";
@@ -55,7 +56,7 @@ const App = () => (
               path="/admin/dashboard" 
               element={
                 <RestaurantManagerRoute>
-                  <RestaurantDashboard />
+                  <RestaurantDashboardWrapper />
                 </RestaurantManagerRoute>
               } 
             />
@@ -83,13 +84,21 @@ const App = () => (
                 </RestaurantManagerRoute>
               } 
             />
-            <Route 
-              path="/admin/orders" 
+                        <Route
+              path="/admin/orders"
               element={
                 <RestaurantManagerRoute>
                   <OrderManagement />
                 </RestaurantManagerRoute>
-              } 
+              }
+            />
+            <Route
+              path="/admin/order-history"
+              element={
+                <RestaurantManagerRoute>
+                  <OrderHistory />
+                </RestaurantManagerRoute>
+              }
             />
             <Route 
               path="/admin/staff" 

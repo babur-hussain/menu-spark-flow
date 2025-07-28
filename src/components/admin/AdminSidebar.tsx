@@ -23,6 +23,7 @@ import {
   UserCog,
   Globe,
   TrendingUp,
+  Clock,
 } from "lucide-react";
 
 interface AdminSidebarProps {
@@ -46,6 +47,7 @@ export function AdminSidebar({ userRole }: AdminSidebarProps) {
     { title: "Menu Management", url: "/admin/menu", icon: UtensilsCrossed },
     { title: "QR Codes", url: "/admin/qr-codes", icon: QrCode },
     { title: "Orders", url: "/admin/orders", icon: CreditCard },
+    { title: "Order History", url: "/admin/order-history", icon: Clock },
     { title: "Staff", url: "/admin/staff", icon: Users },
     { title: "Analytics", url: "/admin/analytics", icon: BarChart3 },
     { title: "Reviews", url: "/admin/reviews", icon: Star },

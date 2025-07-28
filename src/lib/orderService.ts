@@ -48,6 +48,8 @@ export interface CreateOrderData {
 export const orderService = {
   async getOrders(restaurantId: string): Promise<Order[]> {
     try {
+      console.log('orderService.getOrders called with restaurantId:', restaurantId);
+      
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -63,6 +65,8 @@ export const orderService = {
         `)
         .eq('restaurant_id', restaurantId)
         .order('created_at', { ascending: false });
+
+      console.log('orderService.getOrders result:', { data, error });
 
       if (error) {
         console.error('Error fetching orders:', error);

@@ -108,93 +108,81 @@ const Features = () => {
   };
 
   return (
-    <section className="py-24 bg-gradient-to-br from-orange-50 via-red-50 to-yellow-50 relative overflow-hidden">
+    <section className="py-20 bg-gradient-to-br from-orange-50 via-red-50 to-yellow-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 relative overflow-hidden">
       {/* Animated Background Elements */}
-      <div className="absolute inset-0 opacity-5">
-        <div className="absolute top-20 left-10 w-32 h-32 bg-orange-500 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-20 right-10 w-40 h-40 bg-red-500 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }}></div>
-        <div className="absolute top-1/2 left-1/2 w-24 h-24 bg-yellow-500 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "2s" }}></div>
+      <div className="absolute inset-0 opacity-5 dark:opacity-10">
+        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-gradient-to-r from-orange-400 to-red-400 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }}></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-pink-400 to-purple-400 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "2s" }}></div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        {/* Enhanced Header */}
+        {/* Header */}
         <div className="text-center mb-16">
-          <Badge className="px-6 py-3 text-lg font-bold bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 text-white border-0 shadow-xl mb-6">
-            🚀 Powerful Features
+          <Badge className="mb-6 px-6 py-3 text-lg font-bold bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 dark:from-orange-600 dark:via-red-600 dark:to-pink-600 text-white border-0 shadow-xl">
+            ✨ Powerful Features
           </Badge>
-          <h2 className="text-4xl md:text-6xl font-black mb-6 bg-gradient-to-r from-orange-600 via-red-600 to-pink-600 bg-clip-text text-transparent">
+          <h2 className="text-4xl md:text-6xl font-black mb-6 bg-gradient-to-r from-orange-600 via-red-600 to-pink-600 dark:from-orange-400 dark:via-red-400 dark:to-pink-400 bg-clip-text text-transparent">
             Everything You Need to
-            <span className="block mt-2 bg-gradient-to-r from-yellow-600 via-orange-600 to-red-600 bg-clip-text text-transparent">
-              Succeed
-            </span>
           </h2>
-          <p className="text-xl text-gray-700 max-w-3xl mx-auto leading-relaxed">
-            From QR code generation to advanced analytics, we provide all the tools 
-            you need to transform your restaurant operations.
+          <h2 className="text-4xl md:text-6xl font-black mb-8 bg-gradient-to-r from-yellow-600 via-orange-600 to-red-600 dark:from-yellow-400 dark:via-orange-400 dark:to-red-400 bg-clip-text text-transparent">
+            Succeed
+          </h2>
+          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed">
+            From QR code generation to real-time analytics, we provide all the tools 
+            you need to transform your restaurant operations and boost customer satisfaction.
           </p>
         </div>
 
-        {/* Enhanced Features Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {/* Features Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
           {features.map((feature, index) => (
             <Card
               key={index}
-              className={`group relative overflow-hidden bg-gradient-to-br ${feature.bgGradient} shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-500 animate-float`}
+              className={`group relative overflow-hidden bg-gradient-to-br ${feature.bgGradient} border-0 shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-500 animate-float dark:shadow-gray-900/50`}
               style={{ animationDelay: `${index * 0.1}s` }}
             >
-              <div className={`absolute inset-0 bg-gradient-to-r ${feature.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-500`}></div>
-              
-              <CardHeader className="relative z-10">
-                <div className="flex items-center justify-between mb-4">
-                  <div className={`p-3 rounded-xl bg-gradient-to-r ${feature.gradient} text-white shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-                    <feature.icon className="h-8 w-8" />
-                  </div>
-                  <Badge 
-                    variant={getBadgeVariant(feature.badge)}
-                    className="font-bold"
-                  >
-                    {feature.badge}
-                  </Badge>
+              <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent dark:from-gray-800/20 rounded-lg"></div>
+              <CardContent className="p-8 relative z-10">
+                <div className={`inline-flex p-4 rounded-xl bg-gradient-to-r ${feature.gradient} text-white shadow-lg group-hover:scale-110 transition-transform duration-300 mb-6`}>
+                  <feature.icon className="h-8 w-8" />
                 </div>
-                <CardTitle className="text-xl font-bold text-gray-800 group-hover:text-gray-900 transition-colors duration-300">
+                <CardTitle className="text-2xl font-bold mb-4 text-gray-900 dark:text-gray-100">
                   {feature.title}
                 </CardTitle>
-              </CardHeader>
-              
-              <CardContent className="relative z-10">
-                <CardDescription className="text-gray-600 leading-relaxed">
+                <CardDescription className="text-gray-600 dark:text-gray-300 text-lg leading-relaxed">
                   {feature.description}
                 </CardDescription>
               </CardContent>
-
-              {/* Hover Effect Overlay */}
-              <div className={`absolute inset-0 bg-gradient-to-r ${feature.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-500`}></div>
             </Card>
           ))}
         </div>
 
-        {/* Enhanced CTA Section */}
-        <div className="text-center mt-16">
-          <div className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 rounded-3xl p-8 shadow-2xl">
-            <h3 className="text-3xl font-bold text-white mb-4">
+        {/* CTA Section */}
+        <div className="text-center">
+          <div className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 dark:from-orange-600 dark:via-red-600 dark:to-pink-600 rounded-3xl p-8 shadow-2xl">
+            <h3 className="text-3xl md:text-4xl font-bold text-white mb-4">
               Ready to Transform Your Restaurant?
             </h3>
-            <p className="text-orange-100 mb-8 text-lg">
-              Join thousands of restaurants already using our platform
+            <p className="text-xl text-white/90 mb-8 max-w-2xl mx-auto">
+              Join thousands of restaurants already using our platform to increase 
+              efficiency and customer satisfaction.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button 
-                className="px-8 py-4 text-lg font-bold bg-white text-orange-600 hover:bg-orange-50 shadow-xl transform hover:scale-105 transition-all duration-300"
+                size="lg"
+                className="bg-white text-orange-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-orange-400 dark:hover:bg-gray-700 font-bold text-lg px-8 py-4 rounded-full shadow-xl transform hover:scale-105 transition-all duration-300"
                 onClick={() => window.location.href = '/restaurant-registration'}
               >
                 🚀 Start Free Trial
               </Button>
               <Button 
                 variant="outline"
-                className="px-8 py-4 text-lg font-bold border-2 border-white text-white hover:bg-white hover:text-orange-600 shadow-xl transform hover:scale-105 transition-all duration-300"
-                onClick={() => document.querySelector('#qr')?.scrollIntoView({ behavior: 'smooth' })}
+                size="lg"
+                className="border-2 border-white text-white hover:bg-white hover:text-orange-600 dark:border-gray-300 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-orange-400 font-bold text-lg px-8 py-4 rounded-full shadow-xl transform hover:scale-105 transition-all duration-300"
+                onClick={() => window.location.href = '/admin/login'}
               >
-                📱 Watch Demo
+                📊 View Demo
               </Button>
             </div>
           </div>

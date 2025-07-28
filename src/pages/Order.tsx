@@ -6,12 +6,14 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Minus, ShoppingCart, Star, Clock, Leaf, Flame, Heart, Sparkles, Moon, Sun, X } from 'lucide-react';
+import { Plus, Minus, ShoppingCart, Star, Clock, Leaf, Flame, Heart, Sparkles, Moon, Sun, X, Check, RefreshCw, QrCode, Package, User, MapPin, Printer, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Star as StarIcon } from 'lucide-react';
+import { orderHistoryService } from '@/lib/orderHistoryService';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertCircle, ArrowLeft, Utensils } from 'lucide-react';
 
 interface Restaurant {
   id: string;
@@ -45,6 +47,7 @@ interface MenuItem {
   allergens?: string[];
   category_id: string;
   category: string;
+  created_at?: string;
 }
 
 interface CartItem {
@@ -55,6 +58,7 @@ interface CartItem {
   special_instructions?: string;
   addons?: string[];
   variant?: string;
+  menu_item_id: string; // Store the original menu item ID
 }
 
 export default function Order() {
@@ -65,6 +69,14 @@ export default function Order() {
   // Extract table number from URL parameters
   const urlParams = new URLSearchParams(location.search);
   const tableNumberFromUrl = urlParams.get('table');
+  
+  // Debug logging
+  console.log('Order component mounted with:', {
+    restaurantId,
+    tableNumberFromUrl,
+    pathname: location.pathname,
+    search: location.search
+  });
   
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [categories, setCategories] = useState<Category[]>([{ id: 'all', name: 'All Items', description: '', sort_order: -1 }]);
@@ -78,6 +90,8 @@ export default function Order() {
   const [showCartPopup, setShowCartPopup] = useState(false);
   const [showItemDetails, setShowItemDetails] = useState(false);
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
+  const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
+  const [selectedVariant, setSelectedVariant] = useState<string>('regular');
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('user');
     return saved ? JSON.parse(saved) : null;
@@ -89,7 +103,6 @@ export default function Order() {
   const [authName, setAuthName] = useState('');
   const [authError, setAuthError] = useState('');
   const [showOrders, setShowOrders] = useState(false);
-  const [orderHistory, setOrderHistory] = useState<any[]>([]);
   const [reviews, setReviews] = useState<{[key: string]: any[]}>({});
   const [reviewText, setReviewText] = useState('');
   const [reviewRating, setReviewRating] = useState(5);
@@ -107,16 +120,131 @@ export default function Order() {
   // Order tracking state
   const [lastOrder, setLastOrder] = useState<any>(null);
   const [showTracking, setShowTracking] = useState(false);
+  const [orderUpdates, setOrderUpdates] = useState<any>(null);
+  const [realTimeSubscription, setRealTimeSubscription] = useState<any>(null);
+  const [orderHistory, setOrderHistory] = useState<any[]>([]);
+  const [showOrderHistory, setShowOrderHistory] = useState(false);
 
-  // On mount, load last order from localStorage
+  // On mount, load last order and order history from cookies
   useEffect(() => {
     const saved = localStorage.getItem('last_order');
-    if (saved) setLastOrder(JSON.parse(saved));
+    if (saved) {
+      const order = JSON.parse(saved);
+      console.log('Loading order from localStorage:', order);
+      console.log('Order ID from localStorage:', order.id);
+      console.log('Is localStorage order local?', order.id.startsWith('local-'));
+      
+      setLastOrder(order);
+      
+      // Check if order is completed and hide tracking if so
+      if (order.status === 'completed' || order.status === 'cancelled') {
+        setShowTracking(false);
+      }
+    }
+    
+    // Load order history from cookies
+    const history = getOrderHistoryFromCookies();
+    setOrderHistory(history);
   }, []);
+
+  // Set up real-time subscription for order updates
+  useEffect(() => {
+    if (lastOrder?.id && !lastOrder.id.startsWith('local-')) {
+      console.log('Setting up real-time subscription for order:', lastOrder.id);
+      
+      const subscription = supabase
+        .channel(`order-${lastOrder.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'orders',
+            filter: `id=eq.${lastOrder.id}`
+          },
+          (payload) => {
+            console.log('Order update received:', payload);
+            console.log('Old status:', payload.old?.status, 'New status:', payload.new.status);
+            
+            setOrderUpdates(payload.new);
+            
+            // Update the last order with new status
+            setLastOrder(prev => {
+              const updatedOrder = {
+                ...prev,
+                status: payload.new.status,
+                updated_at: payload.new.updated_at
+              };
+              console.log('Updated lastOrder:', updatedOrder);
+              return updatedOrder;
+            });
+            
+            // Show notification for status changes
+            if (payload.new.status !== payload.old?.status) {
+              const statusLabels = {
+                'pending': 'Order Placed',
+                'confirmed': 'Order Confirmed',
+                'preparing': 'Preparing Your Order',
+                'ready': 'Your Order is Ready!',
+                'completed': 'Order Completed',
+                'cancelled': 'Order Cancelled'
+              };
+              
+              toast({
+                title: "Order Status Updated!",
+                description: `Your order is now: ${statusLabels[payload.new.status as keyof typeof statusLabels] || payload.new.status}`,
+                duration: 5000,
+              });
+
+              // Auto-hide tracking for completed/cancelled orders after 5 seconds
+              if (payload.new.status === 'completed' || payload.new.status === 'cancelled') {
+                setTimeout(() => {
+                  setShowTracking(false);
+                  toast({
+                    title: "Order Complete",
+                    description: "Order tracking has been hidden. You can view your order history anytime.",
+                    duration: 3000,
+                  });
+                }, 5000);
+              }
+            }
+          }
+        )
+        .subscribe((status) => {
+          console.log('Subscription status:', status);
+          if (status === 'SUBSCRIBED') {
+            console.log('Real-time subscription connected successfully');
+            setOrderUpdates(lastOrder); // Set initial connection state
+          }
+        });
+
+      setRealTimeSubscription(subscription);
+
+      return () => {
+        console.log('Cleaning up real-time subscription');
+        subscription.unsubscribe();
+      };
+    } else if (lastOrder?.id?.startsWith('local-')) {
+      console.log('Local order detected, skipping real-time subscription');
+      setOrderUpdates(null); // Clear real-time state for local orders
+    }
+
+    // Cleanup subscription on unmount
+    return () => {
+      if (realTimeSubscription) {
+        console.log('Cleaning up real-time subscription on unmount');
+        realTimeSubscription.unsubscribe();
+      }
+    };
+  }, [lastOrder?.id]);
 
   // Order tracking status logic
   const getOrderStatus = (order: any) => {
     if (!order) return 'pending';
+    // Use the actual status from the database if available
+    if (order.status) return order.status;
+    
+    // Fallback to calculated status for local orders
     const now = Date.now();
     if (now < order.placedAt + 5 * 60 * 1000) return 'pending'; // 0-5 min
     if (now < order.placedAt + 20 * 60 * 1000) return 'preparing'; // 5-20 min
@@ -126,14 +254,31 @@ export default function Order() {
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'pending': return 'Order Placed';
-      case 'preparing': return 'Preparing';
+      case 'confirmed': return 'Order Confirmed';
+      case 'preparing': return 'Preparing Your Order';
       case 'ready': return 'Ready for Pickup/Delivery';
-      case 'completed': return 'Completed';
-      default: return status;
+      case 'completed': return 'Order Completed';
+      case 'cancelled': return 'Order Cancelled';
+      default: return status.charAt(0).toUpperCase() + status.slice(1);
     }
   };
   const getProgress = (order: any) => {
     if (!order) return 0;
+    
+    // Use status-based progress for database orders
+    if (order.status) {
+      switch (order.status) {
+        case 'pending': return 10;
+        case 'confirmed': return 25;
+        case 'preparing': return 50;
+        case 'ready': return 85;
+        case 'completed': return 100;
+        case 'cancelled': return 0;
+        default: return 10;
+      }
+    }
+    
+    // Fallback to time-based progress for local orders
     const now = Date.now();
     const total = order.estReady - order.placedAt;
     const elapsed = Math.min(now - order.placedAt, total);
@@ -141,6 +286,21 @@ export default function Order() {
   };
   const getEta = (order: any) => {
     if (!order) return '';
+    
+    // Use status-based ETA for database orders
+    if (order.status) {
+      switch (order.status) {
+        case 'pending': return 'Waiting for confirmation';
+        case 'confirmed': return 'Order confirmed, preparing soon';
+        case 'preparing': return 'Your order is being prepared';
+        case 'ready': return 'Your order is ready!';
+        case 'completed': return 'Order completed';
+        case 'cancelled': return 'Order cancelled';
+        default: return 'Processing...';
+      }
+    }
+    
+    // Fallback to time-based ETA for local orders
     const mins = Math.max(0, Math.round((order.estReady - Date.now()) / 60000));
     return mins > 0 ? `${mins} min${mins > 1 ? 's' : ''}` : 'Ready!';
   };
@@ -165,7 +325,7 @@ export default function Order() {
 
   // Coupon state
   const [coupon, setCoupon] = useState('');
-  const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<{code: string} | null>(null);
   const [couponError, setCouponError] = useState('');
   const [discount, setDiscount] = useState(0);
 
@@ -191,7 +351,7 @@ export default function Order() {
       setDiscount(0);
       return;
     }
-    setAppliedCoupon(found.code);
+    setAppliedCoupon({ code: found.code });
     let d = 0;
     if (found.type === 'percent') d = getCartTotal() * (found.value / 100);
     if (found.type === 'flat') d = found.value;
@@ -326,11 +486,133 @@ export default function Order() {
     }
   }, [user, showOrders]);
 
+  // Cookie management functions
+  const getOrderHistoryFromCookies = () => {
+    try {
+      const cookies = document.cookie.split(';');
+      const orderHistoryCookie = cookies.find(cookie => cookie.trim().startsWith('order_history='));
+      if (orderHistoryCookie) {
+        const value = orderHistoryCookie.split('=')[1];
+        return JSON.parse(decodeURIComponent(value));
+      }
+    } catch (error) {
+      console.error('Error parsing order history from cookies:', error);
+    }
+    return [];
+  };
+
   // Save each new order to order_history
   const saveOrderToHistory = (order: any) => {
-    const allOrders = JSON.parse(localStorage.getItem('order_history') || '[]');
-    allOrders.unshift(order);
-    localStorage.setItem('order_history', JSON.stringify(allOrders));
+    try {
+      const history = getOrderHistoryFromCookies();
+      const newHistory = [order, ...history].slice(0, 50); // Keep last 50 orders
+      
+      // Save to cookies with 30 days expiration
+      const expires = new Date();
+      expires.setDate(expires.getDate() + 30);
+      document.cookie = `order_history=${encodeURIComponent(JSON.stringify(newHistory))}; expires=${expires.toUTCString()}; path=/`;
+      
+      // Also save to localStorage as backup
+      localStorage.setItem('order_history', JSON.stringify(newHistory));
+      
+      setOrderHistory(newHistory);
+    } catch (error) {
+      console.error('Error saving order to history:', error);
+    }
+  };
+
+  const clearCompletedOrder = (orderId: string) => {
+    try {
+      const history = getOrderHistoryFromCookies();
+      const updatedHistory = history.filter(order => order.id !== orderId);
+      
+      const expires = new Date();
+      expires.setDate(expires.getDate() + 30);
+      document.cookie = `order_history=${encodeURIComponent(JSON.stringify(updatedHistory))}; expires=${expires.toUTCString()}; path=/`;
+      
+      localStorage.setItem('order_history', JSON.stringify(updatedHistory));
+      setOrderHistory(updatedHistory);
+      
+      // Clear last order if it's the completed one
+      if (lastOrder?.id === orderId) {
+        localStorage.removeItem('last_order');
+        setLastOrder(null);
+        setShowTracking(false);
+      }
+    } catch (error) {
+      console.error('Error clearing completed order:', error);
+    }
+  };
+
+  const generateBill = async (order: any) => {
+    const billWindow = window.open('', '_blank', 'width=800,height=600');
+    if (!billWindow) return;
+
+    const billHTML = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Bill - Order #${order.id.slice(-8)}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
+          .restaurant-name { font-size: 24px; font-weight: bold; }
+          .order-info { margin-bottom: 20px; }
+          .items { margin-bottom: 20px; }
+          .item { display: flex; justify-content: space-between; margin: 5px 0; }
+          .total { border-top: 1px solid #ccc; padding-top: 10px; font-weight: bold; font-size: 18px; }
+          .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #666; }
+          @media print { body { margin: 0; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="restaurant-name">${restaurant?.name || 'Restaurant'}</div>
+          <div>Order #${order.id.slice(-8)}</div>
+          <div>${new Date(order.created_at || order.placedAt).toLocaleString()}</div>
+        </div>
+        
+        <div class="order-info">
+          <div><strong>Customer:</strong> ${order.customer_name || order.customer}</div>
+          <div><strong>Table:</strong> ${order.table_number || order.tableNumber}</div>
+          <div><strong>Status:</strong> ${order.status}</div>
+        </div>
+        
+        <div class="items">
+          <h3>Order Items:</h3>
+          ${(order.items || []).map((item: any) => `
+            <div class="item">
+              <span>${item.quantity}x ${item.name || item.menu_item_name}</span>
+              <span>$${(item.price * item.quantity).toFixed(2)}</span>
+            </div>
+          `).join('')}
+        </div>
+        
+        <div class="total">
+          <div class="item">
+            <span>Total Amount:</span>
+            <span>$${order.total_amount || order.total}</span>
+          </div>
+        </div>
+        
+        <div class="footer">
+          <p>Thank you for dining with us!</p>
+          <p>Generated on ${new Date().toLocaleString()}</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    billWindow.document.write(billHTML);
+    billWindow.document.close();
+    billWindow.focus();
+    
+    // Mark bill as generated in permanent history
+    try {
+      await orderHistoryService.updateOrderStatus(order.id, order.status, true);
+    } catch (error) {
+      console.error('Error updating bill generation status:', error);
+    }
   };
 
   // Persist cart in localStorage
@@ -369,96 +651,241 @@ export default function Order() {
     };
   }, [showCartPopup]);
 
-  const loadRestaurantData = async () => {
-    if (!restaurantId) {
-      setError('Restaurant ID is required');
-      setLoading(false);
-      return;
-    }
 
-    try {
-      console.log('Loading restaurant data for:', restaurantId);
-      setLoading(true);
-      setError(null);
 
-      // Fetch restaurant
-      const { data: restaurantData, error: restaurantError } = await supabase
-        .from('restaurants')
-        .select('*')
-        .eq('id', restaurantId)
-        .single();
-
-      if (restaurantError) {
-        console.error('Restaurant fetch error:', restaurantError);
-        setError('Restaurant not found');
-        setLoading(false);
-        return;
-      }
-
-      if (!restaurantData) {
-        setError('Restaurant not found');
-        setLoading(false);
-        return;
-      }
-
-      console.log('Fetched restaurant:', restaurantData);
-      setRestaurant(restaurantData);
-
-      // Fetch categories
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from('menu_categories')
-        .select('*')
-        .eq('restaurant_id', restaurantId)
-        .order('sort_order');
-
-      if (categoriesError) {
-        console.error('Categories fetch error:', categoriesError);
-        setError('Failed to load categories');
-        setLoading(false);
-        return;
-      }
-
-      console.log('Fetched categories:', categoriesData);
-      setCategories(prev => [...prev, ...(categoriesData || [])]);
-
-      // Fetch menu items with category names
-      const { data: menuItemsData, error: menuItemsError } = await supabase
-        .from('menu_items')
-        .select(`
-          *,
-          menu_categories!inner(name)
-        `)
-        .eq('restaurant_id', restaurantId)
-        .eq('is_available', true)
-        .order('created_at');
-
-      if (menuItemsError) {
-        console.error('Menu items fetch error:', menuItemsError);
-        setError('Failed to load menu items');
-        setLoading(false);
-        return;
-      }
-
-      console.log('Fetched menu items:', menuItemsData);
+    useEffect(() => {
+    console.log('useEffect triggered with restaurantId:', restaurantId);
+    
+    if (restaurantId) {
+      console.log('Restaurant ID found, loading data...');
       
-      // Map the data to include category names
-      const mappedMenuItems = (menuItemsData || []).map(item => ({
-        ...item,
-        category: item.menu_categories?.name || 'Uncategorized'
-      }));
+      // Show demo data immediately for fast loading
+      const demoRestaurant = {
+        id: restaurantId,
+        name: "Demo Restaurant",
+        description: "A great restaurant with delicious food",
+        address: "123 Demo Street, Demo City",
+        phone: "+1-555-0123",
+        logo_url: null,
+        cover_image_url: null,
+        rating: 4.5,
+        cuisines: ["Italian", "American"]
+      };
+      
+      const demoCategories = [
+        { id: 'all', name: 'All Items', description: '', sort_order: -1 },
+        { id: '1', name: 'Appetizers', description: 'Start your meal right', sort_order: 1 },
+        { id: '2', name: 'Main Course', description: 'Delicious main dishes', sort_order: 2 },
+        { id: '3', name: 'Desserts', description: 'Sweet endings', sort_order: 3 },
+        { id: '4', name: 'Beverages', description: 'Refreshing drinks', sort_order: 4 }
+      ];
+      
+      const demoMenuItems = [
+        {
+          id: '1',
+          name: 'Margherita Pizza',
+          description: 'Classic tomato and mozzarella pizza',
+          price: 12.99,
+          image_url: null,
+          is_available: true,
+          is_featured: true,
+          preparation_time: 15,
+          dietary_info: ['Vegetarian'],
+          allergens: ['Gluten', 'Dairy'],
+          category_id: '2',
+          category: 'Main Course',
+          created_at: new Date().toISOString()
+        },
+        {
+          id: '2',
+          name: 'Chicken Burger',
+          description: 'Juicy chicken burger with fresh vegetables',
+          price: 1.00,
+          image_url: null,
+          is_available: true,
+          is_featured: true,
+          preparation_time: 10,
+          dietary_info: [],
+          allergens: ['Gluten'],
+          category_id: '2',
+          category: 'Main Course',
+          created_at: new Date().toISOString()
+        },
+        {
+          id: '3',
+          name: 'Caesar Salad',
+          description: 'Fresh romaine lettuce with Caesar dressing',
+          price: 8.99,
+          image_url: null,
+          is_available: true,
+          is_featured: false,
+          preparation_time: 5,
+          dietary_info: ['Vegetarian'],
+          allergens: ['Dairy'],
+          category_id: '1',
+          category: 'Appetizers',
+          created_at: new Date().toISOString()
+        }
+      ];
+      
+      // Try to load real data first, fallback to demo data if it fails
+      const loadRealData = async () => {
+        try {
+          console.log('Attempting to fetch real data from Supabase...');
+          
+          const { data: restaurantData, error: restaurantError } = await supabase
+            .from('restaurants')
+            .select('*')
+            .eq('id', restaurantId)
+            .single();
 
-      setMenuItems(mappedMenuItems);
-      setLoading(false);
+          console.log('Restaurant query result:', { data: restaurantData, error: restaurantError });
 
-    } catch (error) {
-      console.error('Unexpected error:', error);
-      setError('An unexpected error occurred');
+          if (restaurantError) {
+            console.error('Restaurant fetch error:', restaurantError);
+            throw new Error(`Restaurant not found: ${restaurantError.message}`);
+          }
+
+          if (!restaurantData) {
+            console.error('No restaurant data returned');
+            throw new Error('Restaurant not found in database');
+          }
+
+          console.log('Real restaurant data found:', restaurantData);
+          setRestaurant(restaurantData);
+          
+          // Fetch categories
+          console.log('Fetching categories...');
+          const { data: categoriesData, error: categoriesError } = await supabase
+            .from('menu_categories')
+            .select('*')
+            .eq('restaurant_id', restaurantId)
+            .order('sort_order');
+            
+          console.log('Categories query result:', { data: categoriesData, error: categoriesError });
+          
+          if (categoriesError) {
+            console.error('Categories fetch error:', categoriesError);
+          } else {
+            setCategories([
+              { id: 'all', name: 'All Items', description: '', sort_order: -1 },
+              ...(categoriesData || [])
+            ]);
+          }
+          
+          // Fetch menu items
+          console.log('Fetching menu items...');
+          const { data: menuItemsData, error: menuItemsError } = await supabase
+            .from('menu_items')
+            .select(`
+              *,
+              menu_categories(name)
+            `)
+            .eq('restaurant_id', restaurantId)
+            .eq('is_available', true)
+            .order('created_at');
+            
+          console.log('Menu items query result:', { data: menuItemsData, error: menuItemsError });
+          
+          if (menuItemsError) {
+            console.error('Menu items fetch error:', menuItemsError);
+          } else {
+            const mappedMenuItems = (menuItemsData || []).map(item => ({
+              ...item,
+              category: item.menu_categories?.name || 'Uncategorized'
+            }));
+            setMenuItems(mappedMenuItems);
+          }
+          
+          setLoading(false);
+          console.log('Real data loaded successfully from Supabase');
+          
+        } catch (error) {
+          console.error('Error loading real data:', error);
+          
+          // Try to retry once more
+          try {
+            console.log('Retrying real data fetch...');
+            const { data: retryRestaurantData, error: retryRestaurantError } = await supabase
+              .from('restaurants')
+              .select('*')
+              .eq('id', restaurantId)
+              .single();
+              
+            if (!retryRestaurantError && retryRestaurantData) {
+              console.log('Real data loaded on retry:', retryRestaurantData);
+              setRestaurant(retryRestaurantData);
+              
+              // Fetch categories and menu items on retry
+              const { data: retryCategoriesData } = await supabase
+                .from('menu_categories')
+                .select('*')
+                .eq('restaurant_id', restaurantId)
+                .order('sort_order');
+                
+              if (retryCategoriesData) {
+                setCategories([
+                  { id: 'all', name: 'All Items', description: '', sort_order: -1 },
+                  ...retryCategoriesData
+                ]);
+              }
+              
+              const { data: retryMenuItemsData } = await supabase
+                .from('menu_items')
+                .select(`
+                  *,
+                  menu_categories(name)
+                `)
+                .eq('restaurant_id', restaurantId)
+                .eq('is_available', true)
+                .order('created_at');
+                
+              if (retryMenuItemsData) {
+                const mappedRetryMenuItems = retryMenuItemsData.map(item => ({
+                  ...item,
+                  category: item.menu_categories?.name || 'Uncategorized'
+                }));
+                setMenuItems(mappedRetryMenuItems);
+              }
+              
+              setLoading(false);
+              console.log('Real data loaded successfully on retry');
+              return;
+            }
+          } catch (retryError) {
+            console.error('Retry also failed:', retryError);
+          }
+          
+          console.log('Falling back to demo data...');
+          
+          // Fallback to demo data
+          setRestaurant(demoRestaurant);
+          setCategories(demoCategories);
+          setMenuItems(demoMenuItems);
+          setLoading(false);
+          console.log('Demo data loaded as fallback');
+        }
+      };
+      
+      // Load real data
+      loadRealData();
+      
+      // Add a timeout to prevent infinite loading
+      const timeoutId = setTimeout(() => {
+        if (loading) {
+          console.log('Loading timeout reached, showing error');
+          setLoading(false);
+          setError('Loading timeout. Please check your internet connection and try again.');
+        }
+      }, 30000); // 30 seconds timeout for real data loading
+      
+      return () => clearTimeout(timeoutId);
+      
+    } else {
+      console.log('No restaurant ID found');
+      setError('Invalid restaurant URL');
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadRestaurantData();
   }, [restaurantId]);
 
   const addToCart = (item: MenuItem, specialInstructions?: string, selectedAddons: string[] = [], selectedVariant: string = 'regular') => {
@@ -482,6 +909,7 @@ export default function Order() {
           special_instructions: specialInstructions,
           addons: selectedAddons,
           variant: selectedVariant,
+          menu_item_id: item.id, // Store the original menu item ID
         };
         return [...prevCart, newItem];
       }
@@ -506,7 +934,11 @@ export default function Order() {
   };
 
   const handlePlaceOrder = async () => {
+    console.log('handlePlaceOrder called');
+    console.log('Current placingOrder state:', placingOrder);
+    
     if (!restaurant) {
+      console.log('No restaurant found');
       toast({
         title: "Error",
         description: "Restaurant information not found",
@@ -515,13 +947,60 @@ export default function Order() {
       return;
     }
 
-    setPlacingOrder(true);
+    if (cart.length === 0) {
+      console.log('Cart is empty');
+      toast({
+        title: "Empty Cart",
+        description: "Please add items to your cart before placing an order",
+        variant: "destructive",
+      });
+      return;
+    }
 
+    console.log('Setting placingOrder to true');
+    setPlacingOrder(true);
+    console.log('Starting order placement...');
+
+    // Test Supabase connection first
+    console.log('Testing Supabase connection...');
+    try {
+      const { data: testData, error: testError } = await supabase
+        .from('orders')
+        .select('count')
+        .limit(1);
+      
+      if (testError) {
+        console.error('Supabase connection test failed:', testError);
+        toast({
+          title: "Connection Error",
+          description: "Cannot connect to the server. Please check your internet connection.",
+          variant: "destructive",
+        });
+        setPlacingOrder(false);
+        return;
+      }
+      
+      console.log('Supabase connection test successful');
+    } catch (connectionError) {
+      console.error('Supabase connection error:', connectionError);
+      toast({
+        title: "Connection Error",
+        description: "Cannot connect to the server. Please check your internet connection.",
+        variant: "destructive",
+      });
+      setPlacingOrder(false);
+      return;
+    }
+
+    // Try to create order in Supabase
+    console.log('Attempting to create order in Supabase...');
+    
     try {
       // Auto-generate customer info based on table number
       const customerName = tableNumber ? `Table ${tableNumber} Guest` : 'Guest';
       const customerPhone = tableNumber ? `Table-${tableNumber}` : 'N/A';
       
+      // First, create the order in Supabase
       const orderData = {
         restaurant_id: restaurant.id,
         customer_name: customerName,
@@ -531,36 +1010,103 @@ export default function Order() {
         notes: customerInfo.notes,
         total_amount: getFinalTotal(),
         status: 'pending',
-        order_items: cart.map(item => ({
-          menu_item_id: item.id.split('-')[0], // Extract original menu item ID
-          quantity: item.quantity,
-          price: item.price,
-          special_instructions: item.special_instructions,
-          addons: item.addons,
-          variant: item.variant,
-        })),
+        order_type: 'dine_in',
+        created_at: new Date().toISOString()
       };
 
-      const { data, error } = await supabase
+      console.log('Creating order with data:', orderData);
+      console.log('Restaurant ID being used:', restaurant.id);
+
+      // Create order in Supabase without timeout
+      const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert([orderData])
         .select()
         .single();
 
-      if (error) {
-        console.error('Order creation error:', error);
-        toast({
-          title: "Order failed",
-          description: "Failed to place order. Please try again.",
-          variant: "destructive",
-        });
-        return;
+      console.log('Order creation result:', { data: order, error: orderError });
+
+      if (orderError) {
+        console.error('Order creation error:', orderError);
+        throw new Error(`Database error: ${orderError.message}`);
       }
 
-      toast({
-        title: "Order placed successfully!",
-        description: `Your order #${data.id.slice(-8)} has been placed. We'll bring it to your table when ready.`,
-      });
+      if (!order) {
+        console.error('No order data returned');
+        throw new Error('No order data returned from database');
+      }
+
+      console.log('Order created successfully in Supabase:', order);
+
+      // Then, create order items in Supabase
+      const orderItemsData = cart.map(item => ({
+        order_id: order.id,
+        menu_item_id: item.menu_item_id,
+        quantity: item.quantity,
+        unit_price: item.price,
+        total_price: item.price * item.quantity,
+        special_instructions: item.special_instructions || null,
+        created_at: new Date().toISOString()
+      }));
+
+      console.log('Creating order items:', orderItemsData);
+
+      // Create order items in Supabase without timeout
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItemsData);
+
+      console.log('Order items creation result:', { error: itemsError });
+
+      if (itemsError) {
+        console.error('Order items creation error:', itemsError);
+        // Try to delete the order if items failed
+        await supabase.from('orders').delete().eq('id', order.id);
+        throw new Error(`Order items error: ${itemsError.message}`);
+      }
+
+      console.log('Order placed successfully in Supabase!');
+      console.log('Order ID from database:', order.id);
+      console.log('Order ID type:', typeof order.id);
+      console.log('Is order ID local format?', order.id.startsWith('local-'));
+
+      // Create order summary for local tracking
+      const orderSummary = {
+        id: order.id,
+        status: 'pending',
+        placedAt: Date.now(),
+        estReady: Date.now() + 25 * 60 * 1000, // 25 mins from now
+        customer: customerName,
+        total: getFinalTotal(),
+        restaurant: restaurant.name,
+        items: cart,
+        email: user?.email || customerInfo.email || 'guest',
+        tableNumber: tableNumber || 'Unknown',
+        updated_at: order.updated_at || new Date().toISOString(),
+        created_at: order.created_at || new Date().toISOString(),
+      };
+      
+      console.log('Created orderSummary:', orderSummary);
+      console.log('OrderSummary ID:', orderSummary.id);
+      console.log('Is orderSummary ID local format?', orderSummary.id.startsWith('local-'));
+
+             // Save order to history
+       saveOrderToHistory(orderSummary);
+       
+       // Save to permanent history for admin/manager
+       try {
+         await orderHistoryService.saveToPermanentHistory(
+           orderSummary, 
+           restaurant.id, 
+           restaurant.name
+         );
+       } catch (error) {
+         console.error('Error saving to permanent history:', error);
+         // Don't fail the order placement if permanent history fails
+       }
+
+      // Set the last order for tracking
+      setLastOrder(orderSummary);
 
       // Clear cart
       setCart([]);
@@ -573,30 +1119,44 @@ export default function Order() {
         notes: '',
       });
 
-      // Save order to history
-      const orderSummary = {
-        id: data.id,
-        status: 'pending',
-        placedAt: Date.now(),
-        estReady: Date.now() + 25 * 60 * 1000, // 25 mins from now
-        customer: customerName,
-        total: getFinalTotal(),
-        restaurant: restaurant.name,
-        items: cart,
-        email: user?.email || customerInfo.email || 'guest',
-        tableNumber: tableNumber || 'Unknown',
-      };
-      saveOrderToHistory(orderSummary);
+      // Show success dialog with tracking options
+      setShowTracking(true);
 
-    } catch (error) {
-      console.error('Order error:', error);
       toast({
-        title: "Order failed",
-        description: "An unexpected error occurred. Please try again.",
+        title: "Order placed successfully!",
+        description: `Your order #${order.id.slice(-8)} has been placed. We'll bring it to your table when ready.`,
+      });
+
+      console.log('Supabase order placement completed successfully');
+
+    } catch (supabaseError) {
+      console.error('Supabase order creation failed:', supabaseError);
+      
+      // Show error to user and ask to retry
+      toast({
+        title: "Order Placement Failed",
+        description: "Failed to place order online. Please check your connection and try again.",
         variant: "destructive",
       });
+      
+      // Don't fall back to local order - force online mode
+      console.log('Order placement failed, not falling back to offline mode');
+      
+      // Clear cart and reset state
+      setCart([]);
+      setShowCheckout(false);
+      setCustomerInfo({
+        name: '',
+        phone: '',
+        email: '',
+        tableNumber: tableNumber || '',
+        notes: '',
+      });
     } finally {
+      console.log('Finally block executed');
+      console.log('Setting placingOrder to false');
       setPlacingOrder(false);
+      console.log('placingOrder should now be false');
     }
   };
 
@@ -611,701 +1171,1301 @@ export default function Order() {
     return categoryMatch && searchMatch;
   });
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
-          <p className="text-lg font-semibold text-gray-700">Loading menu...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto p-6">
-          <div className="text-red-500 text-6xl mb-4">🍽️</div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">Oops!</h1>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <Button onClick={loadRestaurantData} className="bg-orange-500 hover:bg-orange-600">
-            Try Again
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!restaurant) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-lg font-semibold text-gray-700">Restaurant not found</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-yellow-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       {/* Top Navigation Bar */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-orange-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            {/* Left - Back Button */}
-            <button
-              onClick={() => window.history.back()}
-              className="p-2 rounded-full hover:bg-orange-100 transition-colors"
-            >
-              <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-
-            {/* Center - Search Input */}
-            <div className="flex-1 max-w-md mx-4">
-              <div className="relative">
-                <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                <Input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder={t('searchPlaceholder')}
-                  className="w-full pl-10 pr-4 py-2 bg-gray-50 border-gray-200 rounded-full focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-            </div>
-
-            {/* Right - Cart Icon with Badge */}
-            <div className="relative flex items-center gap-2">
-              {/* User Profile / Login */}
-              {user ? (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setShowOrders(true)}
-                    className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-                    title="Order History"
-                  >
-                    <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
-                  </button>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">{user.name}</span>
-                    <button
-                      onClick={handleLogout}
-                      className="p-1 rounded-full hover:bg-gray-100 transition-colors"
-                      title="Logout"
-                    >
-                      <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setShowAuth(true)}
-                  className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-                  title="Login"
-                >
-                  <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                </button>
-              )}
-              
-              {/* Cart Icon */}
-              <button
-                onClick={() => setShowCartPopup(!showCartPopup)}
-                className="cart-button p-2 rounded-full hover:bg-gray-100 transition-colors relative"
-              >
-                <ShoppingCart className="w-6 h-6 text-gray-700" />
-                {cart.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
-                    {getCartItemCount()}
-                  </span>
-                )}
-              </button>
-            </div>
+      <div className="fixed top-0 left-0 right-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-700 shadow-lg">
+        <div className="flex items-center justify-between px-4 py-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => window.history.back()}
+            className="text-gray-700 dark:text-gray-300 hover:text-orange-600 dark:hover:text-orange-400"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          
+          <div className="flex-1 max-w-md mx-4">
+            <Input
+              placeholder={t('searchPlaceholder')}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-white/80 dark:bg-gray-800/80 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+            />
           </div>
-        </div>
-      </div>
-
-      {/* Restaurant Header */}
-      <div className="relative h-80 bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 mt-16">
-        <div className="absolute inset-0 bg-black bg-opacity-30"></div>
-        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"></div>
-        <div className="relative z-10 h-full flex items-center justify-center text-white">
-          <div className="text-center max-w-2xl px-4">
-            <div className="mb-4">
-              <div className="w-20 h-20 mx-auto mb-4 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                <span className="text-3xl">🍽️</span>
-              </div>
-            </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-3 drop-shadow-lg">{restaurant.name}</h1>
-            <p className="text-lg md:text-xl opacity-95 mb-2 drop-shadow-md">{restaurant.description}</p>
-            {restaurant.address && (
-              <p className="text-sm opacity-80 drop-shadow-sm flex items-center justify-center gap-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                {restaurant.address}
-              </p>
-            )}
+          
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowOrderHistory(true)}
+              className="relative text-gray-700 dark:text-gray-300 hover:text-orange-600 dark:hover:text-orange-400"
+            >
+              <Clock className="h-5 w-5" />
+              {orderHistory.length > 0 && (
+                <span className="absolute -top-2 -right-2 bg-blue-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {orderHistory.length}
+                </span>
+              )}
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowCartPopup(!showCartPopup)}
+              className="relative text-gray-700 dark:text-gray-300 hover:text-orange-600 dark:hover:text-orange-400 cart-button"
+            >
+              <ShoppingCart className="h-5 w-5" />
+              {getCartItemCount() > 0 && (
+                <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {getCartItemCount()}
+                </span>
+              )}
+            </Button>
           </div>
         </div>
       </div>
 
       {/* Dark Mode Toggle and Language Selector */}
       <div className="fixed top-20 right-4 z-40 flex flex-col gap-2">
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => setDarkMode(!darkMode)}
-          className="rounded-full p-2 bg-white/90 backdrop-blur border border-orange-200 shadow-lg hover:scale-110 transition-all duration-300"
+          className="p-2 rounded-full bg-white/80 dark:bg-gray-800/80 backdrop-blur border border-gray-200 dark:border-gray-600 shadow-lg hover:scale-110 transition-all duration-300"
         >
-          {darkMode ? <Sun className="w-5 h-5 text-orange-600" /> : <Moon className="w-5 h-5 text-orange-600" />}
-        </button>
-        <select
-          value={lang}
-          onChange={(e) => setLang(e.target.value as 'en' | 'es')}
-          className="rounded-full p-2 bg-white/90 shadow-lg border border-orange-200 text-sm backdrop-blur"
-        >
-          <option value="en">🇺🇸 EN</option>
-          <option value="es">🇪🇸 ES</option>
-        </select>
+          {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </Button>
+        <Select value={lang} onValueChange={setLang}>
+          <SelectTrigger className="w-20 h-8 text-xs bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-600">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {LANGUAGES.map((language) => (
+              <SelectItem key={language.code} value={language.code}>
+                {language.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Category Navigation */}
-      <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
-        {categories.map((category) => (
-          <button
-            key={category.id}
-            onClick={() => setSelectedCategory(category.name)}
-            className={`px-6 py-3 rounded-full whitespace-nowrap transition-all duration-200 font-medium ${
-              selectedCategory === category.name
-                ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30'
-                : 'bg-white text-gray-700 hover:bg-orange-50 border border-orange-200'
-            }`}
-          >
-            {category.name}
-          </button>
-        ))}
-        <button
-          onClick={() => setSelectedCategory('favorites')}
-          className={`px-6 py-3 rounded-full whitespace-nowrap transition-all duration-200 font-medium flex items-center gap-2 ${
-            selectedCategory === 'favorites'
-              ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30'
-              : 'bg-white text-gray-700 hover:bg-orange-50 border border-orange-200'
-          }`}
-        >
-          <Heart className="w-4 h-4" />
-          Favorites
-        </button>
-      </div>
+      {loading ? (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-300">Loading menu...</p>
+          </div>
+        </div>
+      ) : error ? (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center max-w-md mx-auto p-6">
+            <div className="text-red-500 mb-4">
+              <AlertCircle className="h-12 w-12 mx-auto" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Error Loading Menu</h3>
+            <p className="text-gray-600 dark:text-gray-300 mb-4">{error}</p>
+            <Button onClick={() => {
+              setError(null);
+              setLoading(true);
+              // Reload the data
+              const loadRealData = async () => {
+                try {
+                  console.log('Retrying to fetch restaurant data from Supabase...');
+                  
+                  // First, let's check if we can connect to Supabase
+                  console.log('Testing Supabase connection...');
+                  const { data: testData, error: testError } = await supabase
+                    .from('restaurants')
+                    .select('count')
+                    .limit(1);
 
-        {/* Menu Items Grid */}
-        <div className="grid gap-6 lg:grid-cols-3 xl:grid-cols-4">
-          {itemsToShow.map((item) => (
-            <Card key={item.id} className="group overflow-hidden hover:shadow-xl transition-all duration-300 border-0 bg-white shadow-lg hover:-translate-y-1">
-              <CardHeader className="p-0">
-                <div className="relative h-48 overflow-hidden">
-                  {item.image_url ? (
-                    <img
-                      src={item.image_url}
-                      alt={item.name}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                    />
+                  console.log('Supabase connection test:', { data: testData, error: testError });
+
+                  if (testError) {
+                    console.error('Supabase connection failed:', testError);
+                    setError('Database connection failed. Please check your internet connection.');
+                    setLoading(false);
+                    return;
+                  }
+
+                  // Fetch restaurant data
+                  console.log('Fetching restaurant data...');
+                  const { data: restaurantData, error: restaurantError } = await supabase
+                    .from('restaurants')
+                    .select('*')
+                    .eq('id', restaurantId)
+                    .single();
+
+                  console.log('Restaurant query result:', { data: restaurantData, error: restaurantError });
+
+                  if (restaurantError) {
+                    console.error('Restaurant fetch error:', restaurantError);
+                    setError(`Restaurant not found: ${restaurantError.message}`);
+                    setLoading(false);
+                    return;
+                  }
+
+                  if (!restaurantData) {
+                    console.error('No restaurant data returned');
+                    setError('Restaurant not found');
+                    setLoading(false);
+                    return;
+                  }
+
+                  console.log('Restaurant found:', restaurantData);
+                  setRestaurant(restaurantData);
+
+                  // Fetch categories
+                  console.log('Fetching categories...');
+                  const { data: categoriesData, error: categoriesError } = await supabase
+                    .from('menu_categories')
+                    .select('*')
+                    .eq('restaurant_id', restaurantId)
+                    .order('sort_order');
+
+                  console.log('Categories query result:', { data: categoriesData, error: categoriesError });
+
+                  if (categoriesError) {
+                    console.error('Categories fetch error:', categoriesError);
+                    setError(`Failed to load categories: ${categoriesError.message}`);
+                    setLoading(false);
+                    return;
+                  }
+
+                  console.log('Categories loaded successfully:', categoriesData);
+                  setCategories([
+                    { id: 'all', name: 'All Items', description: '', sort_order: -1 },
+                    ...(categoriesData || [])
+                  ]);
+
+                  // Fetch menu items
+                  console.log('Fetching menu items...');
+                  const { data: menuItemsData, error: menuItemsError } = await supabase
+                    .from('menu_items')
+                    .select(`
+                      *,
+                      menu_categories(name)
+                    `)
+                    .eq('restaurant_id', restaurantId)
+                    .eq('is_available', true)
+                    .order('created_at');
+
+                  console.log('Menu items query result:', { data: menuItemsData, error: menuItemsError });
+
+                  if (menuItemsError) {
+                    console.error('Menu items fetch error:', menuItemsError);
+                    setError(`Failed to load menu items: ${menuItemsError.message}`);
+                    setLoading(false);
+                    return;
+                  }
+
+                  console.log('Menu items loaded successfully:', menuItemsData);
+          
+                  // Map the data to include category names
+                  const mappedMenuItems = (menuItemsData || []).map(item => ({
+                    ...item,
+                    category: item.menu_categories?.name || 'Uncategorized'
+                  }));
+
+                  setMenuItems(mappedMenuItems);
+                  setLoading(false);
+                  console.log('Real data loaded successfully from Supabase');
+          
+                } catch (error) {
+                  console.error('Unexpected error:', error);
+                  setError(`An unexpected error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                  setLoading(false);
+                }
+              };
+
+              loadRealData();
+            }} className="bg-orange-500 hover:bg-orange-600 text-white">
+              Try Again
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div>
+          {/* Restaurant Header */}
+          <div className="relative h-64 md:h-80 bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 dark:from-orange-600 dark:via-red-600 dark:to-pink-600 overflow-hidden">
+            {restaurant?.cover_image_url ? (
+              <img
+                src={restaurant.cover_image_url}
+                alt={restaurant.name}
+                className="w-full h-full object-cover opacity-40"
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-r from-orange-400 to-red-400 dark:from-orange-500 dark:to-red-500" />
+            )}
+            <div className="absolute inset-0 bg-black/20 dark:bg-black/40" />
+            <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-white/20 dark:bg-gray-800/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+                  {restaurant?.logo_url ? (
+                    <img src={restaurant.logo_url} alt="Logo" className="w-10 h-10 rounded-full" />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-orange-100 to-red-100 flex items-center justify-center">
-                      <span className="text-6xl">🍽️</span>
+                    <Utensils className="w-8 h-8" />
+                  )}
+                </div>
+                <div>
+                  <h1 className="text-2xl md:text-3xl font-bold">{restaurant?.name}</h1>
+                  <p className="text-white/90 dark:text-white/80">{restaurant?.description}</p>
+                  {restaurant?.rating && (
+                    <div className="flex items-center gap-1 mt-1">
+                      <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                      <span className="text-sm">{restaurant.rating}</span>
                     </div>
                   )}
-                  
-                  {/* Favorite Button */}
-                  <button
-                    onClick={() => toggleFavorite(item.id)}
-                    className={`absolute top-3 right-3 p-2 rounded-full transition-all duration-300 ${
-                      favorites.includes(item.id)
-                        ? 'bg-red-500 text-white shadow-lg'
-                        : 'bg-white/90 text-gray-400 hover:text-red-500 backdrop-blur'
-                    }`}
-                  >
-                    <Heart className={`w-4 h-4 ${favorites.includes(item.id) ? 'fill-current' : ''}`} />
-                  </button>
-
-                  {/* Badges */}
-                  <div className="absolute top-3 left-3 flex gap-1">
-                    {item.is_featured && (
-                      <Badge className="bg-yellow-500 text-white border-0 shadow-sm">
-                        <Sparkles className="w-3 h-3 mr-1" />
-                        Bestseller
-                      </Badge>
-                    )}
-                    {item.dietary_info?.includes('vegetarian') && (
-                      <Badge className="bg-green-500 text-white border-0 shadow-sm">
-                        <Leaf className="w-3 h-3 mr-1" />
-                        Veg
-                      </Badge>
-                    )}
-                    {item.dietary_info?.includes('spicy') && (
-                      <Badge className="bg-red-500 text-white border-0 shadow-sm">
-                        <Flame className="w-3 h-3 mr-1" />
-                        Spicy
-                      </Badge>
-                    )}
-                    {item.created_at && (() => {
-                      const created = new Date(item.created_at);
-                      const now = new Date();
-                      const diff = (now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24);
-                      return diff <= 7;
-                    })() && (
-                      <Badge className="bg-pink-500 text-white border-0 shadow-sm">
-                        <Sparkles className="w-3 h-3 mr-1" />
-                        New
-                      </Badge>
-                    )}
-                  </div>
                 </div>
-              </CardHeader>
-              
-              <CardContent className="p-4">
-                <div className="flex justify-between items-start mb-3">
-                  <h3 className="font-bold text-lg text-gray-900 group-hover:text-orange-600 transition-colors">{item.name}</h3>
-                  <span className="font-bold text-xl text-orange-600">${item.price.toFixed(2)}</span>
-                </div>
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="flex items-center">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <StarIcon
-                        key={star}
-                        className={`w-4 h-4 ${star <= 4 ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-sm text-gray-500">(4.2 • 12 reviews)</span>
-                </div>
-                <p className="text-gray-600 text-sm mb-4 line-clamp-2">{item.description}</p>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => addToCart(item)}
-                    className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    {t('addToCart')}
-                  </Button>
-                  <Button
-                    onClick={() => openItemDetails(item)}
-                    variant="outline"
-                    className="px-3 py-3 border-orange-300 hover:bg-orange-50"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
-                    </svg>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Empty State */}
-        {itemsToShow.length === 0 && (
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4">🍽️</div>
-            <h3 className="text-2xl font-bold text-gray-700 mb-2">No items found</h3>
-            <p className="text-gray-500">No menu items available in this category.</p>
-          </div>
-        )}
-
-        {/* Cart Summary - Fixed Bottom on Mobile */}
-        {cart.length > 0 && (
-          <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-orange-200 shadow-2xl md:hidden">
-            <div className="p-4">
-              <div className="flex justify-between items-center mb-3">
-                <span className="font-bold text-lg">Total: ${getFinalTotal().toFixed(2)}</span>
-                <span className="text-sm text-gray-500">{getCartItemCount()} items</span>
               </div>
-              <Button
-                onClick={() => setShowCheckout(true)}
-                className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-3 rounded-lg shadow-lg"
-              >
-                {t('checkout')}
-              </Button>
             </div>
           </div>
-        )}
 
-        {/* Cart Summary - Sidebar on Desktop */}
-        {cart.length > 0 && (
-          <div className="cart-popup hidden md:block fixed top-20 right-4 z-50 w-80 bg-white rounded-2xl shadow-2xl border border-orange-200 max-h-96 overflow-y-auto animate-fade-in">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold text-gray-900">Your Order</h3>
+          {/* Category Navigation */}
+          <div className="px-4 py-6">
+            <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
+              {categories.map((category) => (
                 <button
-                  onClick={() => setShowCartPopup(false)}
-                  className="text-gray-500 hover:text-gray-700"
+                  key={category.id}
+                  onClick={() => setSelectedCategory(category.id)}
+                  className={`px-6 py-3 rounded-full whitespace-nowrap transition-all duration-200 font-medium ${
+                    selectedCategory === category.id
+                      ? 'bg-orange-500 text-white shadow-lg'
+                      : 'bg-white/80 dark:bg-gray-800/80 text-gray-700 dark:text-gray-300 hover:bg-orange-100 dark:hover:bg-orange-900/20'
+                  }`}
                 >
-                  <X className="w-5 h-5" />
+                  {category.name}
                 </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Menu Items */}
+          <div className="px-4 pb-6">
+            {itemsToShow.length === 0 ? (
+              <div className="text-center py-12">
+                <Utensils className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500 dark:text-gray-400">No menu items found</p>
               </div>
-              
-              <div className="space-y-3 mb-4">
-                {cart.map((item) => (
-                  <div key={item.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900">{item.name}</p>
-                      <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-gray-900">${(item.price * item.quantity).toFixed(2)}</span>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {itemsToShow.map((item) => (
+                  <Card key={item.id} className="group hover:shadow-xl transition-all duration-300 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+                    <div className="relative">
+                      {item.image_url ? (
+                        <img
+                          src={item.image_url}
+                          alt={item.name}
+                          className="w-full h-48 object-cover rounded-t-lg"
+                        />
+                      ) : (
+                        <div className="w-full h-48 bg-gradient-to-br from-orange-100 to-red-100 dark:from-orange-900/20 dark:to-red-900/20 flex items-center justify-center rounded-t-lg">
+                          <Utensils className="h-12 w-12 text-gray-400" />
+                        </div>
+                      )}
                       <button
-                        onClick={() => removeFromCart(item.id)}
-                        className="text-red-500 hover:text-red-700"
+                        onClick={() => toggleFavorite(item.id)}
+                        className={`absolute top-2 right-2 p-2 rounded-full transition-all duration-200 ${
+                          favorites.includes(item.id)
+                            ? 'bg-red-500 text-white'
+                            : 'bg-white/80 dark:bg-gray-800/80 text-gray-600 dark:text-gray-300 hover:bg-red-500 hover:text-white'
+                        }`}
                       >
-                        <X className="w-4 h-4" />
+                        <Heart className={`h-4 w-4 ${favorites.includes(item.id) ? 'fill-current' : ''}`} />
                       </button>
+                      <div className="absolute top-2 left-2 flex gap-1">
+                        {item.is_featured && (
+                          <Badge className="bg-yellow-500 text-white text-xs">Bestseller</Badge>
+                        )}
+                        {item.dietary_info?.includes('vegetarian') && (
+                          <Badge className="bg-green-500 text-white text-xs">Veg</Badge>
+                        )}
+                        {item.dietary_info?.includes('spicy') && (
+                          <Badge className="bg-red-500 text-white text-xs">Spicy</Badge>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-semibold text-gray-900 dark:text-gray-100">{item.name}</h3>
+                        <span className="font-bold text-orange-600 dark:text-orange-400">${item.price.toFixed(2)}</span>
+                      </div>
+                      <p className="text-gray-600 dark:text-gray-300 text-sm mb-4 line-clamp-2">{item.description}</p>
+                      <Button
+                        onClick={() => openItemDetails(item)}
+                        className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold"
+                      >
+                        {t('addToCart')}
+                      </Button>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
-
-              {/* Coupon Section */}
-              <div className="border-t border-orange-200 pt-4 mb-4">
-                <div className="flex gap-2 mb-2">
-                  <Input
-                    placeholder="Enter coupon code"
-                    value={coupon}
-                    onChange={(e) => setCoupon(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button
-                    onClick={handleApplyCoupon}
-                    disabled={!coupon.trim()}
-                    className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white"
-                  >
-                    Apply
-                  </Button>
-                </div>
-                {appliedCoupon && (
-                  <div className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
-                    <span className="text-sm text-green-700">Coupon applied: {appliedCoupon.code}</span>
-                    <button
-                      onClick={handleRemoveCoupon}
-                      className="text-green-700 hover:text-green-900"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-                {couponError && (
-                  <p className="text-sm text-red-500">{couponError}</p>
-                )}
-              </div>
-
-              <div className="border-t border-orange-200 pt-4">
-                <div className="flex justify-between items-center mb-4">
-                  <span className="font-bold text-lg">Total:</span>
-                  <span className="font-bold text-xl text-orange-600">${getFinalTotal().toFixed(2)}</span>
-                </div>
-                <Button
-                  onClick={() => {
-                    setShowCartPopup(false);
-                    setShowCheckout(true);
-                  }}
-                  className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-3 rounded-lg shadow-lg"
-                >
-                  {t('checkout')}
-                </Button>
-              </div>
-            </div>
+            )}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Checkout Modal */}
-        <Dialog open={showCheckout} onOpenChange={setShowCheckout}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Complete Your Order</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              {/* Table Number Display */}
-              {tableNumber && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-blue-600">📍</span>
-                    <span className="font-medium text-blue-800">
-                      Table {tableNumber}
-                    </span>
-                  </div>
-                  <p className="text-sm text-blue-600 mt-1">
-                    Your order will be delivered to your table
-                  </p>
-                </div>
-              )}
+      {/* Cart Summary - Fixed Bottom on Mobile */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 shadow-2xl md:hidden">
+        <div className="p-4">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('cart')}</span>
+            <span className="text-lg font-bold text-orange-600 dark:text-orange-400">${getFinalTotal().toFixed(2)}</span>
+          </div>
+          <Button
+            onClick={() => setShowCartPopup(true)}
+            className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold"
+            disabled={cart.length === 0}
+          >
+            {t('checkout')} ({getCartItemCount()})
+          </Button>
+        </div>
+      </div>
 
-              {/* Order Summary */}
-              <div className="space-y-2">
-                <h3 className="font-semibold text-lg">Order Summary</h3>
-                <div className="max-h-40 overflow-y-auto space-y-2">
-                  {cart.map((item, index) => (
-                    <div key={index} className="flex justify-between items-center text-sm">
-                      <span className="flex-1">
-                        {item.quantity}x {item.name}
-                      </span>
-                      <span className="font-medium">${(item.price * item.quantity).toFixed(2)}</span>
+      {/* Cart Summary - Sidebar on Desktop */}
+      {showCartPopup && (
+        <div className="hidden md:block fixed top-24 right-4 w-80 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 shadow-2xl max-h-96 overflow-y-auto cart-popup">
+          <div className="p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('cart')}</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowCartPopup(false)}
+                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            {cart.length === 0 ? (
+              <div className="text-center py-8">
+                <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500 dark:text-gray-400">Your cart is empty</p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-3 mb-4">
+                  {cart.map((item) => (
+                    <div key={item.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900 dark:text-gray-100">{item.name}</h4>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Qty: {item.quantity}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-gray-900 dark:text-gray-100">${(item.price * item.quantity).toFixed(2)}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFromCart(item.id)}
+                          className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
-              </div>
-
-              {/* Optional Notes */}
-              <div>
-                <Label htmlFor="notes">Special Instructions (Optional)</Label>
-                <Textarea
-                  id="notes"
-                  value={customerInfo.notes}
-                  onChange={(e) => setCustomerInfo(prev => ({ ...prev, notes: e.target.value }))}
-                  placeholder="Any special requests or dietary requirements..."
-                  rows={3}
-                />
-              </div>
-
-              {/* Total and Place Order */}
-              <div className="border-t pt-4 space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-lg">Total:</span>
-                  <span className="font-bold text-xl text-orange-600">${getFinalTotal().toFixed(2)}</span>
+                
+                {/* Coupon Section */}
+                <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div className="flex gap-2 mb-2">
+                    <Input
+                      placeholder="Coupon code"
+                      value={coupon}
+                      onChange={(e) => setCoupon(e.target.value)}
+                      className="flex-1 text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={handleApplyCoupon}
+                      className="bg-orange-500 hover:bg-orange-600 text-white"
+                    >
+                      Apply
+                    </Button>
+                  </div>
+                  {appliedCoupon && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-green-700 dark:text-green-400">Coupon applied: {appliedCoupon.code}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleRemoveCoupon}
+                        className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  )}
+                  {couponError && <p className="text-red-500 text-sm">{couponError}</p>}
                 </div>
                 
-                {appliedCoupon && (
-                  <div className="flex justify-between items-center text-sm text-green-600">
-                    <span>Discount Applied:</span>
-                    <span>-${discount.toFixed(2)}</span>
+                <div className="border-t border-gray-200 dark:border-gray-600 pt-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('total')}</span>
+                    <span className="text-lg font-bold text-orange-600 dark:text-orange-400">${getFinalTotal().toFixed(2)}</span>
                   </div>
-                )}
-                
+                  <Button
+                    onClick={() => {
+                      setShowCartPopup(false);
+                      setShowCheckout(true);
+                    }}
+                    className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold"
+                  >
+                    {t('checkout')}
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Cart Popup */}
+      {showCartPopup && (
+        <div className="md:hidden fixed inset-0 z-50 bg-black bg-opacity-50 flex items-end cart-popup">
+          <div className="w-full bg-white dark:bg-gray-900 rounded-t-2xl shadow-2xl max-h-[80vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('cart')}</h3>
                 <Button
-                  onClick={handlePlaceOrder}
-                  disabled={placingOrder}
-                  className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-3 rounded-lg shadow-lg"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowCartPopup(false)}
+                  className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                 >
-                  {placingOrder ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Placing Order...
-                    </>
-                  ) : (
-                    `Place Order - $${getFinalTotal().toFixed(2)}`
-                  )}
+                  <X className="h-4 w-4" />
                 </Button>
               </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Item Details Modal */}
-        <Dialog open={showItemDetails} onOpenChange={setShowItemDetails}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>{selectedItem?.name}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <p className="text-gray-600">{selectedItem?.description}</p>
               
-              {/* Add-ons */}
-              <div>
-                <h4 className="font-semibold mb-2">Add-ons</h4>
-                <div className="space-y-2">
-                  {ADDONS.map((addon) => (
-                    <label key={addon.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                      <div className="flex items-center gap-2">
+              {cart.length === 0 ? (
+                <div className="text-center py-8">
+                  <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500 dark:text-gray-400">Your cart is empty</p>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-3 mb-4">
+                    {cart.map((item) => (
+                      <div key={item.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-gray-900 dark:text-gray-100">{item.name}</h4>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">Qty: {item.quantity}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-gray-900 dark:text-gray-100">${(item.price * item.quantity).toFixed(2)}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeFromCart(item.id)}
+                            className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Coupon Section */}
+                  <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div className="flex gap-2 mb-2">
+                      <Input
+                        placeholder="Coupon code"
+                        value={coupon}
+                        onChange={(e) => setCoupon(e.target.value)}
+                        className="flex-1 text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={handleApplyCoupon}
+                        className="bg-orange-500 hover:bg-orange-600 text-white"
+                      >
+                        Apply
+                      </Button>
+                    </div>
+                    {appliedCoupon && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-green-700 dark:text-green-400">Coupon applied: {appliedCoupon.code}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleRemoveCoupon}
+                          className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    )}
+                    {couponError && <p className="text-red-500 text-sm">{couponError}</p>}
+                  </div>
+                  
+                  <div className="border-t border-gray-200 dark:border-gray-600 pt-4">
+                    <div className="flex justify-between items-center mb-4">
+                      <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('total')}</span>
+                      <span className="text-lg font-bold text-orange-600 dark:text-orange-400">${getFinalTotal().toFixed(2)}</span>
+                    </div>
+                    <Button
+                      onClick={() => {
+                        setShowCartPopup(false);
+                        setShowCheckout(true);
+                      }}
+                      className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold"
+                    >
+                      {t('checkout')}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Checkout Modal */}
+      <Dialog open={showCheckout} onOpenChange={setShowCheckout}>
+        <DialogContent className="max-w-md bg-white dark:bg-gray-800">
+          <DialogHeader>
+            <DialogTitle className="text-gray-900 dark:text-gray-100">Complete Your Order</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <p className="text-sm text-gray-600 dark:text-gray-300">Table Number</p>
+              <p className="font-semibold text-gray-900 dark:text-gray-100">{tableNumber || 'Unknown'}</p>
+            </div>
+            <div>
+              <Label htmlFor="notes" className="text-gray-700 dark:text-gray-300">Special Instructions</Label>
+              <Textarea
+                id="notes"
+                value={customerInfo.notes}
+                onChange={(e) => setCustomerInfo({ ...customerInfo, notes: e.target.value })}
+                placeholder="Any special requests or dietary requirements..."
+                className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+              />
+            </div>
+            <div className="flex justify-between items-center text-lg font-semibold">
+              <span className="text-gray-700 dark:text-gray-300">Total:</span>
+              <span className="text-orange-600 dark:text-orange-400">${getFinalTotal().toFixed(2)}</span>
+            </div>
+            <Button
+              onClick={handlePlaceOrder}
+              disabled={placingOrder}
+              className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold"
+            >
+              {placingOrder ? 'Placing Order...' : t('placeOrder')}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Item Details Dialog */}
+      <Dialog open={showItemDetails} onOpenChange={setShowItemDetails}>
+        <DialogContent className="max-w-lg h-[90vh] flex flex-col bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border-0 p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+            <div className="flex items-center gap-4">
+              {selectedItem?.image_url ? (
+                <img
+                  src={selectedItem.image_url}
+                  alt={selectedItem.name}
+                  className="w-16 h-16 rounded-xl object-cover shadow-lg"
+                />
+              ) : (
+                <div className="w-16 h-16 bg-gradient-to-br from-orange-100 to-red-100 dark:from-orange-900/20 dark:to-red-900/20 rounded-xl flex items-center justify-center shadow-lg">
+                  <Utensils className="h-8 w-8 text-orange-500 dark:text-orange-400" />
+                </div>
+              )}
+              <div className="flex-1">
+                <DialogTitle className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">
+                  {selectedItem?.name}
+                </DialogTitle>
+                <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
+                  {selectedItem?.description}
+                </p>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                    ${selectedItem?.price.toFixed(2)}
+                  </span>
+                  {selectedItem?.is_featured && (
+                    <Badge className="bg-yellow-500 text-white text-xs">Bestseller</Badge>
+                  )}
+                  {selectedItem?.dietary_info?.includes('vegetarian') && (
+                    <Badge className="bg-green-500 text-white text-xs">Veg</Badge>
+                  )}
+                  {selectedItem?.dietary_info?.includes('spicy') && (
+                    <Badge className="bg-red-500 text-white text-xs">Spicy</Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+            {/* Add-ons Section */}
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-1 h-6 bg-gradient-to-b from-orange-500 to-red-500 rounded-full"></div>
+                <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Customize Your Order</h4>
+              </div>
+              
+              <div className="space-y-3">
+                <h5 className="font-medium text-gray-700 dark:text-gray-300 mb-3">Add-ons</h5>
+                {ADDONS.map((addon) => (
+                  <label 
+                    key={addon.id} 
+                    className="group flex items-center justify-between p-4 border border-gray-200 dark:border-gray-600 rounded-xl hover:border-orange-300 dark:hover:border-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/10 cursor-pointer transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
                         <input
                           type="checkbox"
-                          className="rounded"
+                          checked={selectedAddons.includes(addon.name)}
                           onChange={(e) => {
                             if (e.target.checked) {
                               setSelectedAddons([...selectedAddons, addon.name]);
                             } else {
-                              setSelectedAddons(selectedAddons.filter(a => a !== addon.name));
+                              setSelectedAddons(selectedAddons.filter(name => name !== addon.name));
                             }
                           }}
+                          className="w-5 h-5 text-orange-600 bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-orange-500 dark:focus:ring-orange-400 focus:ring-2"
                         />
-                        <span>{addon.name}</span>
+                        {selectedAddons.includes(addon.name) && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <Check className="w-3 h-3 text-white" />
+                          </div>
+                        )}
                       </div>
-                      <span className="text-orange-600 font-semibold">+${addon.price.toFixed(2)}</span>
-                    </label>
-                  ))}
-                </div>
+                      <div>
+                        <span className="font-medium text-gray-900 dark:text-gray-100">{addon.name}</span>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Enhance your meal</p>
+                      </div>
+                    </div>
+                    <span className="font-semibold text-orange-600 dark:text-orange-400">+${addon.price.toFixed(2)}</span>
+                  </label>
+                ))}
               </div>
+            </div>
 
-              {/* Variants */}
-              <div>
-                <h4 className="font-semibold mb-2">Size & Style</h4>
-                <div className="space-y-2">
-                  {VARIANTS.map((variant) => (
-                    <label key={variant.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                      <div className="flex items-center gap-2">
+            {/* Variants Section */}
+            <div>
+              <h5 className="font-medium text-gray-700 dark:text-gray-300 mb-3">Size & Style</h5>
+              <div className="space-y-3">
+                {VARIANTS.map((variant) => (
+                  <label 
+                    key={variant.id} 
+                    className="group flex items-center justify-between p-4 border border-gray-200 dark:border-gray-600 rounded-xl hover:border-orange-300 dark:hover:border-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/10 cursor-pointer transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
                         <input
                           type="radio"
                           name="variant"
                           value={variant.name}
                           checked={selectedVariant === variant.name}
                           onChange={(e) => setSelectedVariant(e.target.value)}
-                          className="rounded"
+                          className="w-5 h-5 text-orange-600 bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 focus:ring-orange-500 dark:focus:ring-orange-400 focus:ring-2"
                         />
-                        <span>{variant.name}</span>
+                        {selectedVariant === variant.name && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-2 h-2 bg-orange-600 rounded-full"></div>
+                          </div>
+                        )}
                       </div>
-                      <span className="text-orange-600 font-semibold">+${variant.price.toFixed(2)}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <Button
-                onClick={() => {
-                  if (selectedItem) {
-                    addToCart(selectedItem, '', selectedAddons, selectedVariant);
-                    setShowItemDetails(false);
-                    setSelectedAddons([]);
-                    setSelectedVariant('regular');
-                  }
-                }}
-                className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold"
-              >
-                Add to Cart - ${selectedItem ? (selectedItem.price + 
-                  selectedAddons.reduce((sum, addon) => sum + ADDONS.find(a => a.name === addon)?.price || 0, 0) +
-                  (selectedVariant !== 'regular' ? VARIANTS.find(v => v.name === selectedVariant)?.price || 0 : 0)
-                ).toFixed(2) : '0.00'}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Authentication Modal */}
-        <Dialog open={showAuth} onOpenChange={setShowAuth}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>{authMode === 'login' ? 'Login' : 'Register'}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              {authMode === 'register' && (
-                <div>
-                  <Label>Name</Label>
-                  <Input
-                    value={authName}
-                    onChange={e => setAuthName(e.target.value)}
-                    placeholder="Your name"
-                  />
-                </div>
-              )}
-              <div>
-                <Label>Email</Label>
-                <Input
-                  value={authEmail}
-                  onChange={e => setAuthEmail(e.target.value)}
-                  type="email"
-                  placeholder="your@email.com"
-                />
-              </div>
-              <div>
-                <Label>Password</Label>
-                <Input
-                  value={authPassword}
-                  onChange={e => setAuthPassword(e.target.value)}
-                  type="password"
-                  placeholder="••••••••"
-                />
-              </div>
-              {authError && <p className="text-sm text-red-500">{authError}</p>}
-              <Button onClick={handleAuth} className="w-full">
-                {authMode === 'login' ? 'Login' : 'Register'}
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
-                className="w-full"
-              >
-                {authMode === 'login' ? 'Need an account? Register' : 'Already have an account? Login'}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Order History Modal */}
-        <Dialog open={showOrders} onOpenChange={setShowOrders}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>My Orders</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              {orderHistory.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="text-6xl mb-4">📋</div>
-                  <p className="text-gray-500">No orders yet.</p>
-                </div>
-              ) : (
-                orderHistory.map((order, i) => (
-                  <div key={i} className="bg-gray-50 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-bold">Order #{order.id?.slice(-8) || i + 1}</span>
-                      <span className="text-sm text-gray-500">{new Date(order.placedAt).toLocaleDateString()}</span>
+                      <div>
+                        <span className="font-medium text-gray-900 dark:text-gray-100">{variant.name}</span>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {variant.name === 'Large' ? 'Bigger portion' : 
+                           variant.name === 'Spicy' ? 'Hot & flavorful' : 
+                           variant.name === 'Mild' ? 'Gentle seasoning' : 'Standard size'}
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-sm text-gray-600 mb-2">
-                      {order.items?.map((item: any, idx: number) => (
-                        <span key={idx} className="inline-block bg-white px-2 py-1 rounded mr-2 mb-1">
-                          {item.name} x{item.quantity}
+                    <span className="font-semibold text-orange-600 dark:text-orange-400">
+                      {variant.price > 0 ? `+$${variant.price.toFixed(2)}` : 'Free'}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Special Instructions */}
+            <div>
+              <h5 className="font-medium text-gray-700 dark:text-gray-300 mb-3">Special Instructions</h5>
+              <Textarea
+                placeholder="Any special requests, allergies, or cooking preferences..."
+                className="w-full bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 rounded-xl resize-none"
+                rows={3}
+              />
+            </div>
+          </div>
+
+          {/* Fixed Bottom Section */}
+          <div className="border-t border-gray-200 dark:border-gray-700 p-6 flex-shrink-0">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <span className="text-sm text-gray-500 dark:text-gray-400">Total Price</span>
+                <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                  ${selectedItem ? (selectedItem.price + 
+                    selectedAddons.reduce((sum, addon) => sum + ADDONS.find(a => a.name === addon)?.price || 0, 0) +
+                    (selectedVariant !== 'regular' ? VARIANTS.find(v => v.name === selectedVariant)?.price || 0 : 0)
+                  ).toFixed(2) : '0.00'}
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-sm text-gray-500 dark:text-gray-400">Base Price</span>
+                <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  ${selectedItem?.price.toFixed(2)}
+                </div>
+                {selectedAddons.length > 0 && (
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    +{selectedAddons.length} add-on{selectedAddons.length > 1 ? 's' : ''}
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <Button
+              onClick={() => {
+                if (selectedItem) {
+                  addToCart(selectedItem, '', selectedAddons, selectedVariant);
+                  setShowItemDetails(false);
+                  setSelectedAddons([]);
+                  setSelectedVariant('regular');
+                }
+              }}
+              className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 dark:from-orange-600 dark:to-red-600 dark:hover:from-orange-700 dark:hover:to-red-700 text-white font-semibold py-4 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
+            >
+              <ShoppingCart className="w-5 h-5 mr-2" />
+              Add to Cart
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Authentication Modal */}
+      <Dialog open={showAuth} onOpenChange={setShowAuth}>
+        <DialogContent className="max-w-md bg-white dark:bg-gray-800">
+          <DialogHeader>
+            <DialogTitle className="text-gray-900 dark:text-gray-100">{authMode === 'login' ? 'Login' : 'Register'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {authMode === 'register' && (
+              <div>
+                <Label className="text-gray-700 dark:text-gray-300">Name</Label>
+                <Input
+                  value={authName}
+                  onChange={e => setAuthName(e.target.value)}
+                  placeholder="Your name"
+                  className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+                />
+              </div>
+            )}
+            <div>
+              <Label className="text-gray-700 dark:text-gray-300">Email</Label>
+              <Input
+                value={authEmail}
+                onChange={e => setAuthEmail(e.target.value)}
+                type="email"
+                placeholder="your@email.com"
+                className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+              />
+            </div>
+            <div>
+              <Label className="text-gray-700 dark:text-gray-300">Password</Label>
+              <Input
+                value={authPassword}
+                onChange={e => setAuthPassword(e.target.value)}
+                type="password"
+                placeholder="••••••••"
+                className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+              />
+            </div>
+            {authError && <p className="text-sm text-red-500">{authError}</p>}
+            <Button onClick={handleAuth} className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white">
+              {authMode === 'login' ? 'Login' : 'Register'}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
+              className="w-full text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100"
+            >
+              {authMode === 'login' ? 'Need an account? Register' : 'Already have an account? Login'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Order History Modal */}
+      <Dialog open={showOrderHistory} onOpenChange={setShowOrderHistory}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto bg-white dark:bg-gray-800">
+          <DialogHeader>
+            <DialogTitle className="text-gray-900 dark:text-gray-100 flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Order History
+            </DialogTitle>
+            <DialogDescription>
+              View your past orders and generate bills
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {orderHistory.length === 0 ? (
+              <div className="text-center py-8">
+                <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <p className="text-gray-500 dark:text-gray-400">No order history yet</p>
+                <p className="text-sm text-gray-400">Your orders will appear here after you place them</p>
+              </div>
+            ) : (
+              orderHistory.map((order, index) => (
+                <div key={index} className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:shadow-md transition-shadow">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-semibold text-gray-900 dark:text-gray-100">
+                          Order #{order.id.slice(-8)}
                         </span>
-                      ))}
+                        <Badge className={`${
+                          order.status === 'completed' ? 'bg-green-500' :
+                          order.status === 'ready' ? 'bg-blue-500' :
+                          order.status === 'preparing' ? 'bg-yellow-500' :
+                          order.status === 'confirmed' ? 'bg-orange-500' :
+                          order.status === 'cancelled' ? 'bg-red-500' :
+                          'bg-gray-500'
+                        }`}>
+                          {order.status}
+                        </Badge>
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-300">
+                        {new Date(order.created_at || order.placedAt || order.date).toLocaleString()}
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-lg">${order.total?.toFixed(2)}</span>
-                      <span className="text-sm text-green-600 font-semibold">{order.status || 'Completed'}</span>
+                    <div className="text-right">
+                      <div className="font-semibold text-gray-900 dark:text-gray-100">
+                        ${(order.total_amount || order.total).toFixed(2)}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {order.items?.length || 0} items
+                      </div>
                     </div>
                   </div>
-                ))
+                  
+                  <div className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <MapPin className="h-3 w-3" />
+                      <span>Table {order.table_number || order.tableNumber}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <User className="h-3 w-3" />
+                      <span>{order.customer_name || order.customer}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+                    <div className="font-medium mb-1">Items:</div>
+                    <div className="space-y-1">
+                      {(order.items || []).slice(0, 3).map((item: any, itemIndex: number) => (
+                        <div key={itemIndex} className="flex justify-between">
+                          <span>{item.quantity}x {item.name || item.menu_item_name}</span>
+                          <span>${(item.price * item.quantity).toFixed(2)}</span>
+                        </div>
+                      ))}
+                      {(order.items || []).length > 3 && (
+                        <div className="text-gray-500 text-xs">
+                          +{(order.items || []).length - 3} more items
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2 pt-3 border-t border-gray-200 dark:border-gray-600">
+                    {(order.status === 'completed' || order.status === 'ready') && (
+                      <Button
+                        size="sm"
+                        onClick={() => generateBill(order)}
+                        className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white"
+                      >
+                        <Printer className="h-4 w-4 mr-1" />
+                        Generate Bill
+                      </Button>
+                    )}
+                    {order.status === 'completed' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => clearCompletedOrder(order.id)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Remove
+                      </Button>
+                    )}
+                    {order.status !== 'completed' && order.status !== 'cancelled' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setLastOrder(order);
+                          setShowTracking(true);
+                          setShowOrderHistory(false);
+                        }}
+                      >
+                        <Clock className="h-4 w-4 mr-1" />
+                        Track Order
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Floating Order Tracking Button */}
+      {lastOrder && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <Button
+            onClick={() => setShowTracking(true)}
+            className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 hover:from-orange-600 hover:via-red-600 hover:to-pink-600 text-white font-semibold shadow-2xl rounded-full p-4 transform hover:scale-105 transition-all duration-300 animate-pulse"
+          >
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <Clock className="h-5 w-5" />
+                {orderUpdates && (
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-ping"></div>
+                )}
+              </div>
+              <div className="text-left">
+                <div className="font-bold">Track Order</div>
+                <div className="text-xs opacity-90">{getEta(lastOrder)}</div>
+              </div>
+              {orderUpdates && (
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  <span className="text-xs font-medium">LIVE</span>
+                </div>
+              )}
+            </div>
+          </Button>
+        </div>
+      )}
+
+      {/* Order Tracking Dialog */}
+      {lastOrder && (
+        <Dialog open={showTracking} onOpenChange={setShowTracking}>
+          <DialogContent className="max-w-lg bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border-0 p-0 overflow-hidden max-h-[90vh] flex flex-col">
+            <DialogHeader className="p-6 pb-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-orange-500 to-red-500 text-white flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-full">
+                  <Clock className="h-6 w-6" />
+                </div>
+                <div>
+                  <DialogTitle className="text-xl font-bold">Order Tracking</DialogTitle>
+                  <p className="text-white/90 text-sm">Track your order in real-time</p>
+                </div>
+              </div>
+            </DialogHeader>
+            
+            <div className="p-6 space-y-6 overflow-y-auto flex-1">
+              {/* Order Number */}
+              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-orange-500 rounded-full">
+                    <QrCode className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Order Number</p>
+                    <p className="font-mono font-bold text-lg text-gray-900 dark:text-gray-100">{lastOrder.id.slice(-8)}</p>
+                  </div>
+                </div>
+                {orderUpdates && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                    <span className="text-xs text-green-600 dark:text-green-400 font-medium">LIVE</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Status */}
+              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-full ${
+                    getOrderStatus(lastOrder) === 'completed' ? 'bg-green-500' :
+                    getOrderStatus(lastOrder) === 'ready' ? 'bg-blue-500' :
+                    getOrderStatus(lastOrder) === 'preparing' ? 'bg-yellow-500' :
+                    getOrderStatus(lastOrder) === 'confirmed' ? 'bg-orange-500' :
+                    getOrderStatus(lastOrder) === 'cancelled' ? 'bg-red-500' :
+                    'bg-gray-500'
+                  }`}>
+                    {getOrderStatus(lastOrder) === 'completed' ? <Check className="h-4 w-4 text-white" /> :
+                     getOrderStatus(lastOrder) === 'ready' ? <Clock className="h-4 w-4 text-white" /> :
+                     getOrderStatus(lastOrder) === 'preparing' ? <RefreshCw className="h-4 w-4 text-white" /> :
+                     getOrderStatus(lastOrder) === 'confirmed' ? <Check className="h-4 w-4 text-white" /> :
+                     getOrderStatus(lastOrder) === 'cancelled' ? <X className="h-4 w-4 text-white" /> :
+                     <Clock className="h-4 w-4 text-white" />}
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Status</p>
+                    <p className={`font-semibold ${
+                      getOrderStatus(lastOrder) === 'completed' ? 'text-green-700 dark:text-green-400' :
+                      getOrderStatus(lastOrder) === 'ready' ? 'text-blue-700 dark:text-blue-400' :
+                      getOrderStatus(lastOrder) === 'preparing' ? 'text-yellow-700 dark:text-yellow-400' :
+                      getOrderStatus(lastOrder) === 'confirmed' ? 'text-orange-700 dark:text-orange-400' :
+                      getOrderStatus(lastOrder) === 'cancelled' ? 'text-red-700 dark:text-red-400' :
+                      'text-gray-700 dark:text-gray-400'
+                    }`}>{getStatusLabel(getOrderStatus(lastOrder))}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className={`text-2xl font-bold ${
+                    getOrderStatus(lastOrder) === 'completed' ? 'text-green-600 dark:text-green-400' :
+                    getOrderStatus(lastOrder) === 'ready' ? 'text-blue-600 dark:text-blue-400' :
+                    getOrderStatus(lastOrder) === 'preparing' ? 'text-yellow-600 dark:text-yellow-400' :
+                    getOrderStatus(lastOrder) === 'confirmed' ? 'text-orange-600 dark:text-orange-400' :
+                    getOrderStatus(lastOrder) === 'cancelled' ? 'text-red-600 dark:text-red-400' :
+                    'text-gray-600 dark:text-gray-400'
+                  }`}>
+                    {getProgress(lastOrder).toFixed(0)}%
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Complete</p>
+                </div>
+              </div>
+
+              {/* ETA with Beautiful Timer */}
+              <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-500 rounded-full">
+                      <Clock className="h-4 w-4 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Estimated Time</p>
+                      <p className="font-semibold text-blue-700 dark:text-blue-400">{getEta(lastOrder)}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                      {Math.max(0, Math.round((lastOrder.estReady - Date.now()) / 60000))}
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">minutes left</p>
+                  </div>
+                </div>
+                
+                {/* Beautiful Progress Bar */}
+                <div className="relative">
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 rounded-full transition-all duration-1000 ease-out shadow-lg"
+                      style={{ 
+                        width: `${getProgress(lastOrder)}%`,
+                        background: `linear-gradient(90deg, #3b82f6 ${getProgress(lastOrder)}%, #8b5cf6 ${getProgress(lastOrder) + 20}%, #ec4899 ${getProgress(lastOrder) + 40}%)`
+                      }}
+                    />
+                  </div>
+                  {/* Progress indicators */}
+                  <div className="flex justify-between mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    <span>Ordered</span>
+                    <span>Preparing</span>
+                    <span>Ready</span>
+                    <span>Complete</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Order Details */}
+              <div className="p-4 bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-900/20 dark:to-slate-900/20 rounded-xl">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-gray-500 rounded-full">
+                      <ShoppingCart className="h-4 w-4 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Total Amount</p>
+                      <p className="font-bold text-2xl text-gray-900 dark:text-gray-100">${lastOrder.total.toFixed(2)}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Table {lastOrder.tableNumber}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{lastOrder.customer}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Real-time indicator */}
+              {orderUpdates && (
+                <div className="p-3 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl border border-green-200 dark:border-green-800">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                    <p className="text-sm text-green-700 dark:text-green-400 font-medium">
+                      ✓ Real-time updates enabled
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Last update time */}
+              {lastOrder?.updated_at && (
+                <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <div>
+                      <p className="text-sm text-blue-700 dark:text-blue-400 font-medium">
+                        Last Updated
+                      </p>
+                      <p className="text-xs text-blue-600 dark:text-blue-400">
+                        {new Date(lastOrder.updated_at).toLocaleTimeString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Debug info (only in development) */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="p-3 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 rounded-xl border border-yellow-200 dark:border-yellow-800">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${orderUpdates ? 'bg-green-400' : 'bg-red-400'}`}></div>
+                    <div>
+                      <p className="text-sm text-yellow-700 dark:text-yellow-400 font-medium">
+                        Debug Info
+                      </p>
+                      <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                        Order ID: {lastOrder?.id?.slice(-8)} | Status: {lastOrder?.status} | Real-time: {orderUpdates ? 'Connected' : 'Disconnected'}
+                      </p>
+                      <p className="text-xs text-yellow-500 dark:text-yellow-500 mt-1">
+                        Order Type: {lastOrder?.id?.startsWith('local-') ? 'Local' : 'Database'} | Subscription: {realTimeSubscription ? 'Active' : 'Inactive'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <Button 
+                  onClick={() => setShowTracking(false)}
+                  className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-3 rounded-xl"
+                >
+                  Close
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={async () => {
+                    // Refresh order status from database
+                    if (lastOrder?.id && !lastOrder.id.startsWith('local-')) {
+                      try {
+                        console.log('Refreshing order status for:', lastOrder.id);
+                        const { data: order, error } = await supabase
+                          .from('orders')
+                          .select('*')
+                          .eq('id', lastOrder.id)
+                          .single();
+                        
+                        if (error) {
+                          console.error('Error fetching order:', error);
+                          toast({
+                            title: "Error",
+                            description: "Failed to refresh order status",
+                            variant: "destructive",
+                          });
+                        } else if (order) {
+                          console.log('Refreshed order data:', order);
+                          setLastOrder(prev => ({
+                            ...prev,
+                            status: order.status,
+                            updated_at: order.updated_at
+                          }));
+                          setOrderUpdates(order);
+                          toast({
+                            title: "Status Refreshed",
+                            description: `Order status: ${order.status}`,
+                          });
+                        }
+                      } catch (error) {
+                        console.error('Error refreshing order:', error);
+                      }
+                    } else {
+                      // For local orders, just refresh the dialog
+                      setShowTracking(false);
+                      setTimeout(() => setShowTracking(true), 100);
+                    }
+                  }}
+                  className="px-4 py-3 rounded-xl"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              {/* Connection test button (only in development) */}
+              {process.env.NODE_ENV === 'development' && lastOrder?.id && !lastOrder.id.startsWith('local-') && (
+                <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        console.log('Testing connection for order:', lastOrder.id);
+                        const { data: order, error } = await supabase
+                          .from('orders')
+                          .select('*')
+                          .eq('id', lastOrder.id)
+                          .single();
+                        
+                        if (error) {
+                          console.error('Connection test failed:', error);
+                          toast({
+                            title: "Connection Test Failed",
+                            description: error.message,
+                            variant: "destructive",
+                          });
+                        } else {
+                          console.log('Connection test successful:', order);
+                          toast({
+                            title: "Connection Test Successful",
+                            description: `Order found with status: ${order.status}`,
+                          });
+                        }
+                      } catch (error) {
+                        console.error('Connection test error:', error);
+                        toast({
+                          title: "Connection Test Error",
+                          description: "Failed to test connection",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                    className="w-full text-xs"
+                  >
+                    Test Database Connection
+                  </Button>
+                </div>
+              )}
+              
+              {/* Clear localStorage button (only in development) */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="pt-2">
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      localStorage.removeItem('last_order');
+                      setLastOrder(null);
+                      setShowTracking(false);
+                      toast({
+                        title: "LocalStorage Cleared",
+                        description: "Order data cleared. Place a new order to test.",
+                      });
+                    }}
+                    className="w-full text-xs"
+                  >
+                    Clear Order Data
+                  </Button>
+                </div>
               )}
             </div>
           </DialogContent>
         </Dialog>
-
-        {/* Order Tracking Dialog */}
-        {lastOrder && (
-          <Dialog open={showTracking} onOpenChange={setShowTracking}>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Order Tracking</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold">Order #</span>
-                  <span className="text-orange-600 font-mono">{lastOrder.id.slice(-8)}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold">Status:</span>
-                  <span className="text-green-700 font-semibold animate-pulse">{getStatusLabel(getOrderStatus(lastOrder))}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold">ETA:</span>
-                  <span className="text-blue-600 font-semibold">{getEta(lastOrder)}</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-3">
-                  <div
-                    className="bg-gradient-to-r from-orange-400 to-pink-400 h-3 rounded-full transition-all duration-500"
-                    style={{ width: `${getProgress(lastOrder)}%` }}
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold">Total:</span>
-                  <span className="text-lg font-bold">${lastOrder.total.toFixed(2)}</span>
-                </div>
-                <Button className="w-full mt-2" onClick={() => setShowTracking(false)}>Close</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        )}
-      </div>
-    );
-  }
+      )}
+    </div>
+  );
+}

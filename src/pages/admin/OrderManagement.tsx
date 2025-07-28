@@ -30,6 +30,7 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { useAuth } from "@/contexts/AuthContext";
 import { orderService, Order, OrderItem } from "@/lib/orderService";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function OrderManagement() {
   const { toast } = useToast();
@@ -103,16 +104,82 @@ export default function OrderManagement() {
   // Fetch orders on component mount
   useEffect(() => {
     const fetchOrders = async () => {
-      if (!user?.restaurant_id) return;
+      console.log('OrderManagement: user:', user);
+      console.log('OrderManagement: restaurant_id:', user?.restaurant_id);
       
       try {
         setIsLoading(true);
-        const [ordersData, statsData] = await Promise.all([
-          orderService.getOrders(user.restaurant_id),
-          orderService.getOrdersStats(user.restaurant_id),
-        ]);
-        setOrders(ordersData);
-        setOrderStats(statsData);
+        console.log('OrderManagement: Fetching all orders...');
+        
+        // For now, let's fetch all orders to see what's in the database
+        const { data: allOrders, error: ordersError } = await supabase
+          .from('orders')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        console.log('All orders in database:', allOrders);
+        console.log('Orders error:', ordersError);
+        
+        // Also check what restaurants exist
+        const { data: restaurants, error: restaurantsError } = await supabase
+          .from('restaurants')
+          .select('id, name');
+        
+        console.log('Available restaurants:', restaurants);
+        console.log('Restaurants error:', restaurantsError);
+        
+        if (ordersError) {
+          console.error('Error fetching orders:', ordersError);
+          toast({
+            title: "Error",
+            description: "Failed to load orders. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // Convert to the expected format
+        const formattedOrders = (allOrders || []).map(order => ({
+          id: order.id,
+          customer_name: order.customer_name,
+          customer_email: order.customer_email,
+          customer_phone: order.customer_phone,
+          order_type: order.order_type,
+          status: order.status,
+          items: [], // We'll add items later if needed
+          total_amount: order.total_amount,
+          tax_amount: 0,
+          tip_amount: 0,
+          delivery_address: order.delivery_address,
+          table_number: order.table_number,
+          notes: order.notes,
+          restaurant_id: order.restaurant_id,
+          created_at: order.created_at,
+          updated_at: order.updated_at,
+          estimated_delivery: order.estimated_delivery,
+          actual_delivery: order.actual_delivery,
+        }));
+        
+        console.log('Formatted orders:', formattedOrders);
+        
+        setOrders(formattedOrders);
+        
+        // Calculate stats
+        const stats = {
+          total: formattedOrders.length,
+          pending: formattedOrders.filter(o => o.status === 'pending').length,
+          confirmed: formattedOrders.filter(o => o.status === 'confirmed').length,
+          preparing: formattedOrders.filter(o => o.status === 'preparing').length,
+          ready: formattedOrders.filter(o => o.status === 'ready').length,
+          completed: formattedOrders.filter(o => o.status === 'completed').length,
+          cancelled: formattedOrders.filter(o => o.status === 'cancelled').length,
+          totalRevenue: formattedOrders.reduce((sum, order) => sum + order.total_amount, 0),
+          averageOrderValue: formattedOrders.length > 0 ? formattedOrders.reduce((sum, order) => sum + order.total_amount, 0) / formattedOrders.length : 0,
+        };
+        
+        setOrderStats(stats);
+        console.log('Calculated stats:', stats);
+        
       } catch (error) {
         console.error('Error fetching orders:', error);
         toast({
@@ -130,13 +197,30 @@ export default function OrderManagement() {
 
   const updateOrderStatus = async (orderId: string, newStatus: Order['status']) => {
     try {
+      console.log('Updating order status:', { orderId, newStatus });
+      
       const updatedOrder = await orderService.updateOrderStatus(orderId, newStatus);
+      console.log('Order status updated successfully:', updatedOrder);
+      
+      // Update local state
       setOrders(prev => prev.map(order => 
-        order.id === orderId ? updatedOrder : order
+        order.id === orderId ? { ...order, status: newStatus, updated_at: new Date().toISOString() } : order
       ));
+      
+      // Update stats
+      const updatedStats = { ...orderStats };
+      const currentOrder = orders.find(o => o.id === orderId);
+      if (currentOrder?.status === 'pending' && newStatus !== 'pending') {
+        updatedStats.pending = Math.max(0, updatedStats.pending - 1);
+      }
+      if (newStatus === 'pending') {
+        updatedStats.pending += 1;
+      }
+      setOrderStats(updatedStats);
+      
       toast({
         title: "Order Status Updated",
-        description: `Order ${orderId} status changed to ${newStatus}.`,
+        description: `Order #${orderId.slice(-8)} status changed to ${newStatus}.`,
       });
     } catch (error) {
       console.error('Error updating order status:', error);
