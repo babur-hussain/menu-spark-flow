@@ -21,70 +21,80 @@ const Features = () => {
       title: "Smart QR Code Generation",
       description: "Auto-generate unique QR codes per table for instant menu access and seamless ordering experience.",
       badge: "Core Feature",
-      color: "text-primary"
+      gradient: "from-orange-500 to-red-500",
+      bgGradient: "from-orange-50 to-red-50"
     },
     {
       icon: Users,
       title: "Multi-Restaurant Management",
       description: "Manage multiple restaurants with unique menus, staff roles, and customized themes from one dashboard.",
       badge: "Enterprise",
-      color: "text-accent"
+      gradient: "from-blue-500 to-purple-500",
+      bgGradient: "from-blue-50 to-purple-50"
     },
     {
       icon: ChefHat,
       title: "Kitchen Display System",
       description: "Real-time order tracking for kitchen staff with preparation times and priority management.",
       badge: "Pro Feature",
-      color: "text-success"
+      gradient: "from-green-500 to-emerald-500",
+      bgGradient: "from-green-50 to-emerald-50"
     },
     {
       icon: BarChart3,
       title: "Advanced Analytics",
       description: "Track most ordered dishes, peak hours, average bills, and customer preferences with detailed insights.",
       badge: "Analytics",
-      color: "text-warning"
+      gradient: "from-yellow-500 to-orange-500",
+      bgGradient: "from-yellow-50 to-orange-50"
     },
     {
       icon: Smartphone,
       title: "Mobile-First Design",
       description: "Stunning, responsive interface optimized for mobile ordering with smooth animations and intuitive UX.",
       badge: "Design",
-      color: "text-primary"
+      gradient: "from-pink-500 to-rose-500",
+      bgGradient: "from-pink-50 to-rose-50"
     },
     {
       icon: CreditCard,
       title: "Smart Billing System",
       description: "Seamless payment processing with GST invoices, bill splitting, and digital receipt management.",
       badge: "Payments",
-      color: "text-accent"
+      gradient: "from-indigo-500 to-blue-500",
+      bgGradient: "from-indigo-50 to-blue-50"
     },
     {
       icon: Gift,
       title: "Dynamic Offers & Coupons",
       description: "Create flash deals, combo offers, loyalty points, and automated promotional campaigns.",
       badge: "Marketing",
-      color: "text-success"
+      gradient: "from-purple-500 to-pink-500",
+      bgGradient: "from-purple-50 to-pink-50"
     },
     {
       icon: Clock,
       title: "Real-Time Order Management",
       description: "Live order tracking, add/remove items, and instant communication between staff and kitchen.",
       badge: "Operations",
-      color: "text-warning"
+      gradient: "from-teal-500 to-cyan-500",
+      bgGradient: "from-teal-50 to-cyan-50"
     },
     {
       icon: Shield,
       title: "Role-Based Access Control",
       description: "Assign managers, staff, chefs, and delivery personnel with customized permissions per restaurant.",
       badge: "Security",
-      color: "text-destructive"
+      gradient: "from-red-500 to-pink-500",
+      bgGradient: "from-red-50 to-pink-50"
     },
     {
       icon: Zap,
       title: "Offline Mode Support",
       description: "Continue taking orders even with poor internet connectivity, syncing when connection is restored.",
       badge: "Reliability",
-      color: "text-primary"
+      gradient: "from-amber-500 to-yellow-500",
+      bgGradient: "from-amber-50 to-yellow-50"
     }
   ];
 
@@ -98,74 +108,95 @@ const Features = () => {
   };
 
   return (
-    <section id="features" className="py-20 bg-muted/30">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Section Header */}
+    <section className="py-24 bg-gradient-to-br from-orange-50 via-red-50 to-yellow-50 relative overflow-hidden">
+      {/* Animated Background Elements */}
+      <div className="absolute inset-0 opacity-5">
+        <div className="absolute top-20 left-10 w-32 h-32 bg-orange-500 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-20 right-10 w-40 h-40 bg-red-500 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }}></div>
+        <div className="absolute top-1/2 left-1/2 w-24 h-24 bg-yellow-500 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "2s" }}></div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        {/* Enhanced Header */}
         <div className="text-center mb-16">
-          <Badge variant="outline" className="mb-4 px-4 py-2">
-            ✨ Complete Restaurant Solution
+          <Badge className="px-6 py-3 text-lg font-bold bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 text-white border-0 shadow-xl mb-6">
+            🚀 Powerful Features
           </Badge>
-          <h2 className="text-3xl md:text-5xl font-bold mb-6">
+          <h2 className="text-4xl md:text-6xl font-black mb-6 bg-gradient-to-r from-orange-600 via-red-600 to-pink-600 bg-clip-text text-transparent">
             Everything You Need to
-            <span className="text-gradient block mt-2">Revolutionize Your Restaurant</span>
+            <span className="block mt-2 bg-gradient-to-r from-yellow-600 via-orange-600 to-red-600 bg-clip-text text-transparent">
+              Succeed
+            </span>
           </h2>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            From QR code generation to kitchen management, our comprehensive platform 
-            handles every aspect of modern restaurant operations.
+          <p className="text-xl text-gray-700 max-w-3xl mx-auto leading-relaxed">
+            From QR code generation to advanced analytics, we provide all the tools 
+            you need to transform your restaurant operations.
           </p>
         </div>
 
-        {/* Features Grid */}
+        {/* Enhanced Features Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {features.map((feature, index) => (
-            <Card 
-              key={index} 
-              className="food-item group border-border/50 hover:border-primary/30 relative overflow-hidden"
+            <Card
+              key={index}
+              className={`group relative overflow-hidden bg-gradient-to-br ${feature.bgGradient} shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-500 animate-float`}
+              style={{ animationDelay: `${index * 0.1}s` }}
             >
-              {/* Gradient Background */}
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className={`absolute inset-0 bg-gradient-to-r ${feature.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-500`}></div>
               
               <CardHeader className="relative z-10">
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`p-3 rounded-xl bg-background shadow-sm ${feature.color}`}>
-                    <feature.icon className="h-6 w-6" />
+                <div className="flex items-center justify-between mb-4">
+                  <div className={`p-3 rounded-xl bg-gradient-to-r ${feature.gradient} text-white shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                    <feature.icon className="h-8 w-8" />
                   </div>
-                  <Badge variant={getBadgeVariant(feature.badge)} className="text-xs">
+                  <Badge 
+                    variant={getBadgeVariant(feature.badge)}
+                    className="font-bold"
+                  >
                     {feature.badge}
                   </Badge>
                 </div>
-                <CardTitle className="text-xl group-hover:text-primary transition-colors duration-200">
+                <CardTitle className="text-xl font-bold text-gray-800 group-hover:text-gray-900 transition-colors duration-300">
                   {feature.title}
                 </CardTitle>
               </CardHeader>
               
               <CardContent className="relative z-10">
-                <CardDescription className="text-base leading-relaxed">
+                <CardDescription className="text-gray-600 leading-relaxed">
                   {feature.description}
                 </CardDescription>
               </CardContent>
+
+              {/* Hover Effect Overlay */}
+              <div className={`absolute inset-0 bg-gradient-to-r ${feature.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-500`}></div>
             </Card>
           ))}
         </div>
 
-        {/* CTA Section */}
+        {/* Enhanced CTA Section */}
         <div className="text-center mt-16">
-          <p className="text-lg text-muted-foreground mb-6">
-            Ready to transform your restaurant operations?
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button 
-              variant="hero" 
-              onClick={() => window.open('#qr', '_self')}
-            >
-              Start Free Trial
-            </Button>
-            <Button 
-              variant="electric" 
-              onClick={() => window.open('#analytics', '_self')}
-            >
-              Schedule Demo
-            </Button>
+          <div className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 rounded-3xl p-8 shadow-2xl">
+            <h3 className="text-3xl font-bold text-white mb-4">
+              Ready to Transform Your Restaurant?
+            </h3>
+            <p className="text-orange-100 mb-8 text-lg">
+              Join thousands of restaurants already using our platform
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button 
+                className="px-8 py-4 text-lg font-bold bg-white text-orange-600 hover:bg-orange-50 shadow-xl transform hover:scale-105 transition-all duration-300"
+                onClick={() => window.location.href = '/restaurant-registration'}
+              >
+                🚀 Start Free Trial
+              </Button>
+              <Button 
+                variant="outline"
+                className="px-8 py-4 text-lg font-bold border-2 border-white text-white hover:bg-white hover:text-orange-600 shadow-xl transform hover:scale-105 transition-all duration-300"
+                onClick={() => document.querySelector('#qr')?.scrollIntoView({ behavior: 'smooth' })}
+              >
+                📱 Watch Demo
+              </Button>
+            </div>
           </div>
         </div>
       </div>

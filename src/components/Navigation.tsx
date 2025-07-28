@@ -16,13 +16,17 @@ const Navigation = () => {
   ];
 
   return (
-    <nav className="bg-background/95 backdrop-blur-sm border-b border-border sticky top-0 z-50">
+    <nav className="bg-white/95 backdrop-blur-md border-b border-orange-200 sticky top-0 z-50 shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <div className="flex-shrink-0 flex items-center">
-              <QrCode className="h-8 w-8 text-primary mr-2" />
-              <span className="text-2xl font-bold text-gradient">MenuMaster</span>
+              <div className="p-2 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 mr-3 shadow-lg">
+                <QrCode className="h-8 w-8 text-white" />
+              </div>
+              <span className="text-2xl font-black bg-gradient-to-r from-orange-600 via-red-600 to-pink-600 bg-clip-text text-transparent">
+                MenuMaster
+              </span>
             </div>
           </div>
 
@@ -32,7 +36,7 @@ const Navigation = () => {
               <a
                 key={item.name}
                 href={item.href}
-                className="text-muted-foreground hover:text-primary transition-colors duration-200 flex items-center gap-2 font-medium"
+                className="text-gray-700 hover:text-orange-600 transition-all duration-300 flex items-center gap-2 font-semibold hover:scale-105"
                 onClick={(e) => {
                   e.preventDefault();
                   document.querySelector(item.href)?.scrollIntoView({ behavior: 'smooth' });
@@ -49,16 +53,17 @@ const Navigation = () => {
               <>
                 <Button 
                   variant="outline"
+                  className="border-2 border-orange-500 text-orange-600 hover:bg-orange-500 hover:text-white font-semibold transition-all duration-300 hover:scale-105"
                   onClick={() => window.location.href = '/admin/login'}
                 >
                   Admin Login
                 </Button>
                 <Button 
-                  variant="hero" 
+                  className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 hover:from-orange-600 hover:via-red-600 hover:to-pink-600 text-white font-bold shadow-xl transform hover:scale-105 transition-all duration-300"
                   size="lg"
                   onClick={() => window.location.href = '/restaurant-registration'}
                 >
-                  Get Started
+                  🚀 Get Started
                 </Button>
               </>
             )}
@@ -69,6 +74,7 @@ const Navigation = () => {
             <Button
               variant="ghost"
               size="icon"
+              className="text-orange-600 hover:bg-orange-50"
               onClick={() => setIsOpen(!isOpen)}
             >
               {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
@@ -79,12 +85,12 @@ const Navigation = () => {
         {/* Mobile Navigation */}
         {isOpen && (
           <div className="md:hidden">
-            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-card rounded-lg mt-2 border border-border">
+            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl mt-2 shadow-xl">
               {navItems.map((item) => (
                 <a
                   key={item.name}
                   href={item.href}
-                  className="block px-3 py-2 text-muted-foreground hover:text-primary transition-colors duration-200 flex items-center gap-2 font-medium"
+                  className="block px-3 py-2 text-gray-700 hover:text-orange-600 hover:bg-orange-100 transition-all duration-300 flex items-center gap-2 font-semibold rounded-lg"
                   onClick={(e) => {
                     e.preventDefault();
                     setIsOpen(false);
@@ -98,59 +104,22 @@ const Navigation = () => {
               <div className="px-3 py-2 space-y-2">
                 {isAuthenticated ? (
                   <div className="space-y-2">
-                    <div className="px-3 py-2 border rounded-lg">
-                      <p className="text-sm font-medium">{user?.email}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {user?.role === 'super_admin' ? 'Super Admin' : 'Restaurant Manager'}
-                      </p>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      size="lg" 
-                      className="w-full"
-                      onClick={() => {
-                        setIsOpen(false);
-                        window.location.href = user?.role === 'super_admin' ? '/admin/overview' : '/admin/dashboard';
-                      }}
-                    >
-                      Dashboard
-                    </Button>
-                    <Button 
-                      variant="destructive" 
-                      size="lg" 
-                      className="w-full"
-                      onClick={() => {
-                        setIsOpen(false);
-                        // Handle logout
-                        window.location.href = '/admin/login';
-                      }}
-                    >
-                      Logout
-                    </Button>
+                    <ProfileDropdown />
                   </div>
                 ) : (
                   <>
                     <Button 
-                      variant="outline" 
-                      size="lg" 
-                      className="w-full"
-                      onClick={() => {
-                        setIsOpen(false);
-                        window.location.href = '/admin/login';
-                      }}
+                      variant="outline"
+                      className="w-full border-2 border-orange-500 text-orange-600 hover:bg-orange-500 hover:text-white font-semibold"
+                      onClick={() => window.location.href = '/admin/login'}
                     >
                       Admin Login
                     </Button>
                     <Button 
-                      variant="hero" 
-                      size="lg" 
-                      className="w-full"
-                      onClick={() => {
-                        setIsOpen(false);
-                        window.location.href = '/restaurant-registration';
-                      }}
+                      className="w-full bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 hover:from-orange-600 hover:via-red-600 hover:to-pink-600 text-white font-bold shadow-lg"
+                      onClick={() => window.location.href = '/restaurant-registration'}
                     >
-                      Get Started
+                      🚀 Get Started
                     </Button>
                   </>
                 )}

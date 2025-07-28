@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Minus, ShoppingCart, Star, Clock, Leaf, Flame, Heart, Sparkles, Moon, Sun } from 'lucide-react';
+import { Plus, Minus, ShoppingCart, Star, Clock, Leaf, Flame, Heart, Sparkles, Moon, Sun, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Star as StarIcon } from 'lucide-react';
@@ -648,86 +648,88 @@ export default function Order() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 dark:from-gray-900 dark:to-gray-800">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50">
       {/* Top Navigation Bar */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between px-4 py-3">
-          {/* Left - Back Button */}
-          <button 
-            onClick={() => window.history.back()}
-            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-
-          {/* Center - Search Bar */}
-          <div className="flex-1 max-w-md mx-4">
-            <div className="relative">
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={t('searchPlaceholder')}
-                className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-full focus:ring-2 focus:ring-orange-500"
-              />
-              <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      <div className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-orange-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Left - Back Button */}
+            <button
+              onClick={() => window.history.back()}
+              className="p-2 rounded-full hover:bg-orange-100 transition-colors"
+            >
+              <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-            </div>
-          </div>
+            </button>
 
-          {/* Right - Cart Icon with Badge */}
-          <div className="relative flex items-center gap-2">
-            {/* User Profile / Login */}
-            {user ? (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowOrders(true)}
-                  className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                  title="Order History"
-                >
-                  <svg className="w-5 h-5 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                  </svg>
-                </button>
+            {/* Center - Search Input */}
+            <div className="flex-1 max-w-md mx-4">
+              <div className="relative">
+                <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={t('searchPlaceholder')}
+                  className="w-full pl-10 pr-4 py-2 bg-gray-50 border-gray-200 rounded-full focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+            </div>
+
+            {/* Right - Cart Icon with Badge */}
+            <div className="relative flex items-center gap-2">
+              {/* User Profile / Login */}
+              {user ? (
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{user.name}</span>
                   <button
-                    onClick={handleLogout}
-                    className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                    title="Logout"
+                    onClick={() => setShowOrders(true)}
+                    className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                    title="Order History"
                   >
-                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                     </svg>
                   </button>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-700">{user.name}</span>
+                    <button
+                      onClick={handleLogout}
+                      className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                      title="Logout"
+                    >
+                      <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <button
-                onClick={() => setShowAuth(true)}
-                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                title="Login"
-              >
-                <svg className="w-5 h-5 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </button>
-            )}
-            
-            {/* Cart Icon */}
-            <button
-              onClick={() => setShowCartPopup(!showCartPopup)}
-              className="cart-button p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
-            >
-              <ShoppingCart className="w-6 h-6 text-gray-700 dark:text-gray-300" />
-              {cart.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
-                  {getCartItemCount()}
-                </span>
+              ) : (
+                <button
+                  onClick={() => setShowAuth(true)}
+                  className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                  title="Login"
+                >
+                  <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </button>
               )}
-            </button>
+              
+              {/* Cart Icon */}
+              <button
+                onClick={() => setShowCartPopup(!showCartPopup)}
+                className="cart-button p-2 rounded-full hover:bg-gray-100 transition-colors relative"
+              >
+                <ShoppingCart className="w-6 h-6 text-gray-700" />
+                {cart.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                    {getCartItemCount()}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -759,117 +761,119 @@ export default function Order() {
       </div>
 
       {/* Dark Mode Toggle and Language Selector */}
-      <div className="fixed top-20 right-4 z-40 flex gap-2 items-center">
-        <Button
-          variant="ghost"
-          className="rounded-full p-2 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur border border-gray-200 dark:border-gray-700"
-          onClick={() => setDarkMode(d => !d)}
-          aria-label={t('darkMode')}
+      <div className="fixed top-20 right-4 z-40 flex flex-col gap-2">
+        <button
+          onClick={() => setDarkMode(!darkMode)}
+          className="rounded-full p-2 bg-white/90 backdrop-blur border border-orange-200 shadow-lg hover:scale-110 transition-all duration-300"
         >
-          {darkMode ? <Sun className="w-5 h-5 text-yellow-400" /> : <Moon className="w-5 h-5 text-gray-700" />}
-        </Button>
+          {darkMode ? <Sun className="w-5 h-5 text-orange-600" /> : <Moon className="w-5 h-5 text-orange-600" />}
+        </button>
         <select
           value={lang}
-          onChange={e => setLang(e.target.value)}
-          className="rounded-full p-2 bg-white/90 dark:bg-gray-800/90 shadow-lg border border-gray-200 dark:border-gray-700 text-sm backdrop-blur"
-          aria-label={t('language')}
+          onChange={(e) => setLang(e.target.value as 'en' | 'es')}
+          className="rounded-full p-2 bg-white/90 shadow-lg border border-orange-200 text-sm backdrop-blur"
         >
-          {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+          <option value="en">🇺🇸 EN</option>
+          <option value="es">🇪🇸 ES</option>
         </select>
       </div>
 
       {/* Category Navigation */}
-      <div className="px-4 py-6">
-        <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
-          {categories.map((category) => (
-            <button
-              key={category.id}
-              onClick={() => setSelectedCategory(category.name)}
-              className={`px-6 py-3 rounded-full whitespace-nowrap transition-all duration-200 font-medium ${
-                selectedCategory === category.name
-                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30'
-                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-orange-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
-              }`}
-            >
-              {category.name}
-            </button>
-          ))}
+      <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
+        {categories.map((category) => (
           <button
-            onClick={() => setSelectedCategory('favorites')}
-            className={`px-6 py-3 rounded-full whitespace-nowrap transition-all duration-200 font-medium flex items-center gap-2 ${
-              selectedCategory === 'favorites'
+            key={category.id}
+            onClick={() => setSelectedCategory(category.name)}
+            className={`px-6 py-3 rounded-full whitespace-nowrap transition-all duration-200 font-medium ${
+              selectedCategory === category.name
                 ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30'
-                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-orange-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
+                : 'bg-white text-gray-700 hover:bg-orange-50 border border-orange-200'
             }`}
           >
-            <Heart className="w-4 h-4" />
-            Favorites
+            {category.name}
           </button>
-        </div>
+        ))}
+        <button
+          onClick={() => setSelectedCategory('favorites')}
+          className={`px-6 py-3 rounded-full whitespace-nowrap transition-all duration-200 font-medium flex items-center gap-2 ${
+            selectedCategory === 'favorites'
+              ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30'
+              : 'bg-white text-gray-700 hover:bg-orange-50 border border-orange-200'
+          }`}
+        >
+          <Heart className="w-4 h-4" />
+          Favorites
+        </button>
+      </div>
 
-        {/* Menu Items */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {/* Menu Items Grid */}
+        <div className="grid gap-6 lg:grid-cols-3 xl:grid-cols-4">
           {itemsToShow.map((item) => (
-            <Card key={item.id} className="group overflow-hidden hover:shadow-xl transition-all duration-300 border-0 bg-white dark:bg-gray-800 shadow-lg hover:-translate-y-1">
-              <div className="relative">
-                {item.image_url ? (
-                  <img
-                    src={item.image_url}
-                    alt={item.name}
-                    className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                ) : (
-                  <div className="w-full h-48 bg-gradient-to-br from-orange-100 to-red-100 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
-                    <span className="text-6xl">🍽️</span>
-                  </div>
-                )}
-                <div className="absolute top-3 right-3">
+            <Card key={item.id} className="group overflow-hidden hover:shadow-xl transition-all duration-300 border-0 bg-white shadow-lg hover:-translate-y-1">
+              <CardHeader className="p-0">
+                <div className="relative h-48 overflow-hidden">
+                  {item.image_url ? (
+                    <img
+                      src={item.image_url}
+                      alt={item.name}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-orange-100 to-red-100 flex items-center justify-center">
+                      <span className="text-6xl">🍽️</span>
+                    </div>
+                  )}
+                  
+                  {/* Favorite Button */}
                   <button
                     onClick={() => toggleFavorite(item.id)}
-                    className={`p-2 rounded-full transition-all duration-200 ${
+                    className={`absolute top-3 right-3 p-2 rounded-full transition-all duration-300 ${
                       favorites.includes(item.id)
                         ? 'bg-red-500 text-white shadow-lg'
-                        : 'bg-white/90 dark:bg-gray-800/90 text-gray-400 hover:text-red-500 backdrop-blur'
+                        : 'bg-white/90 text-gray-400 hover:text-red-500 backdrop-blur'
                     }`}
                   >
-                    <Heart className="w-5 h-5" fill={favorites.includes(item.id) ? 'currentColor' : 'none'} />
+                    <Heart className={`w-4 h-4 ${favorites.includes(item.id) ? 'fill-current' : ''}`} />
                   </button>
+
+                  {/* Badges */}
+                  <div className="absolute top-3 left-3 flex gap-1">
+                    {item.is_featured && (
+                      <Badge className="bg-yellow-500 text-white border-0 shadow-sm">
+                        <Sparkles className="w-3 h-3 mr-1" />
+                        Bestseller
+                      </Badge>
+                    )}
+                    {item.dietary_info?.includes('vegetarian') && (
+                      <Badge className="bg-green-500 text-white border-0 shadow-sm">
+                        <Leaf className="w-3 h-3 mr-1" />
+                        Veg
+                      </Badge>
+                    )}
+                    {item.dietary_info?.includes('spicy') && (
+                      <Badge className="bg-red-500 text-white border-0 shadow-sm">
+                        <Flame className="w-3 h-3 mr-1" />
+                        Spicy
+                      </Badge>
+                    )}
+                    {item.created_at && (() => {
+                      const created = new Date(item.created_at);
+                      const now = new Date();
+                      const diff = (now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24);
+                      return diff <= 7;
+                    })() && (
+                      <Badge className="bg-pink-500 text-white border-0 shadow-sm">
+                        <Sparkles className="w-3 h-3 mr-1" />
+                        New
+                      </Badge>
+                    )}
+                  </div>
                 </div>
-                <div className="absolute top-3 left-3 flex gap-1">
-                  {item.is_featured && (
-                    <Badge className="bg-yellow-500 text-white border-0 shadow-sm">
-                      <Sparkles className="w-3 h-3 mr-1" />
-                      Bestseller
-                    </Badge>
-                  )}
-                  {item.dietary_info?.includes('vegetarian') && (
-                    <Badge className="bg-green-500 text-white border-0 shadow-sm">
-                      <Leaf className="w-3 h-3 mr-1" />
-                      Veg
-                    </Badge>
-                  )}
-                  {item.dietary_info?.includes('spicy') && (
-                    <Badge className="bg-red-500 text-white border-0 shadow-sm">
-                      <Flame className="w-3 h-3 mr-1" />
-                      Spicy
-                    </Badge>
-                  )}
-                  {item.created_at && (() => {
-                    const created = new Date(item.created_at);
-                    const now = new Date();
-                    const diff = (now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24);
-                    return diff <= 7;
-                  })() && (
-                    <Badge className="bg-pink-500 text-white border-0 shadow-sm">
-                      <Sparkles className="w-3 h-3 mr-1" />
-                      New
-                    </Badge>
-                  )}
-                </div>
-              </div>
-              <CardContent className="p-6">
+              </CardHeader>
+              
+              <CardContent className="p-4">
                 <div className="flex justify-between items-start mb-3">
-                  <h3 className="font-bold text-lg text-gray-900 dark:text-white group-hover:text-orange-600 transition-colors">{item.name}</h3>
+                  <h3 className="font-bold text-lg text-gray-900 group-hover:text-orange-600 transition-colors">{item.name}</h3>
                   <span className="font-bold text-xl text-orange-600">${item.price.toFixed(2)}</span>
                 </div>
                 <div className="flex items-center gap-2 mb-2">
@@ -881,9 +885,9 @@ export default function Order() {
                       />
                     ))}
                   </div>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">(4.2 • 12 reviews)</span>
+                  <span className="text-sm text-gray-500">(4.2 • 12 reviews)</span>
                 </div>
-                <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2">{item.description}</p>
+                <p className="text-gray-600 text-sm mb-4 line-clamp-2">{item.description}</p>
                 <div className="flex gap-2">
                   <Button
                     onClick={() => addToCart(item)}
@@ -895,7 +899,7 @@ export default function Order() {
                   <Button
                     onClick={() => openItemDetails(item)}
                     variant="outline"
-                    className="px-3 py-3 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    className="px-3 py-3 border-orange-300 hover:bg-orange-50"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
@@ -907,103 +911,103 @@ export default function Order() {
           ))}
         </div>
 
+        {/* Empty State */}
         {itemsToShow.length === 0 && (
-          <div className="text-center py-16">
-            <div className="text-8xl mb-6">🍽️</div>
-            <h3 className="text-2xl font-bold text-gray-700 dark:text-gray-300 mb-2">No items found</h3>
-            <p className="text-gray-500 dark:text-gray-400">No menu items available in this category.</p>
+          <div className="text-center py-12">
+            <div className="text-6xl mb-4">🍽️</div>
+            <h3 className="text-2xl font-bold text-gray-700 mb-2">No items found</h3>
+            <p className="text-gray-500">No menu items available in this category.</p>
           </div>
         )}
-      </div>
 
-      {/* Cart Summary - Fixed Bottom on Mobile */}
-      {cart.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 shadow-2xl md:hidden">
-          <div className="flex justify-between items-center px-6 py-4">
-            <div>
-              <p className="font-semibold text-gray-900 dark:text-white">{getCartItemCount()} items</p>
-              <p className="text-orange-600 font-bold text-lg">${getFinalTotal().toFixed(2)}</p>
+        {/* Cart Summary - Fixed Bottom on Mobile */}
+        {cart.length > 0 && (
+          <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-orange-200 shadow-2xl md:hidden">
+            <div className="p-4">
+              <div className="flex justify-between items-center mb-3">
+                <span className="font-bold text-lg">Total: ${getFinalTotal().toFixed(2)}</span>
+                <span className="text-sm text-gray-500">{getCartItemCount()} items</span>
+              </div>
+              <Button
+                onClick={() => setShowCheckout(true)}
+                className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-3 rounded-lg shadow-lg"
+              >
+                {t('checkout')}
+              </Button>
             </div>
-            <Button
-              onClick={() => setShowCartPopup(!showCartPopup)}
-              className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold px-8 py-3 rounded-full shadow-lg"
-            >
-              <ShoppingCart className="w-4 h-4 mr-2" />
-              {t('cart')}
-            </Button>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Mobile Cart Popup */}
-      {cart.length > 0 && showCartPopup && (
-        <div className="md:hidden fixed inset-0 z-50 bg-black bg-opacity-50 flex items-end">
-          <div className="cart-popup w-full bg-white dark:bg-gray-800 rounded-t-3xl shadow-2xl max-h-96 overflow-y-auto animate-fade-in">
+        {/* Cart Summary - Sidebar on Desktop */}
+        {cart.length > 0 && (
+          <div className="cart-popup hidden md:block fixed top-20 right-4 z-50 w-80 bg-white rounded-2xl shadow-2xl border border-orange-200 max-h-96 overflow-y-auto animate-fade-in">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-xl flex items-center text-gray-900 dark:text-white">
-                  <ShoppingCart className="w-6 h-6 mr-2 text-orange-500" />
-                  {t('cart')} ({getCartItemCount()})
-                </h3>
+                <h3 className="text-lg font-bold text-gray-900">Your Order</h3>
                 <button
                   onClick={() => setShowCartPopup(false)}
-                  className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  className="text-gray-500 hover:text-gray-700"
                 >
-                  <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
+              
+              <div className="space-y-3 mb-4">
                 {cart.map((item) => (
-                  <div key={item.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div key={item.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                     <div className="flex-1">
-                      <p className="font-medium text-gray-900 dark:text-white">{item.name}</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Qty: {item.quantity}</p>
+                      <p className="font-medium text-gray-900">{item.name}</p>
+                      <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-gray-900 dark:text-white">${(item.price * item.quantity).toFixed(2)}</span>
+                      <span className="font-bold text-gray-900">${(item.price * item.quantity).toFixed(2)}</span>
                       <button
                         onClick={() => removeFromCart(item.id)}
-                        className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20"
+                        className="text-red-500 hover:text-red-700"
                       >
-                        <Minus className="w-4 h-4" />
+                        <X className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
                 ))}
               </div>
-              
+
               {/* Coupon Section */}
-              {appliedCoupon ? (
-                <div className="flex items-center justify-between mb-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                  <span className="text-green-600 font-semibold text-sm">Coupon {appliedCoupon} applied!</span>
-                  <Button size="sm" variant="ghost" className="text-red-500 h-6 px-2" onClick={handleRemoveCoupon}>Remove</Button>
-                </div>
-              ) : (
-                <div className="flex gap-2 mb-3">
+              <div className="border-t border-orange-200 pt-4 mb-4">
+                <div className="flex gap-2 mb-2">
                   <Input
+                    placeholder="Enter coupon code"
                     value={coupon}
-                    onChange={e => setCoupon(e.target.value)}
-                    placeholder="Promo code"
-                    className="flex-1 text-sm"
+                    onChange={(e) => setCoupon(e.target.value)}
+                    className="flex-1"
                   />
-                  <Button size="sm" onClick={handleApplyCoupon} className="bg-orange-500 hover:bg-orange-600">Apply</Button>
+                  <Button
+                    onClick={handleApplyCoupon}
+                    disabled={!coupon.trim()}
+                    className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white"
+                  >
+                    Apply
+                  </Button>
                 </div>
-              )}
-              {couponError && <p className="text-xs text-red-500 mb-3">{couponError}</p>}
-              
-              {/* Discount */}
-              {discount > 0 && (
-                <div className="flex justify-between items-center text-green-600 font-semibold mb-3">
-                  <span>Discount:</span>
-                  <span>- ${discount.toFixed(2)}</span>
-                </div>
-              )}
-              
-              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                {appliedCoupon && (
+                  <div className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
+                    <span className="text-sm text-green-700">Coupon applied: {appliedCoupon.code}</span>
+                    <button
+                      onClick={handleRemoveCoupon}
+                      className="text-green-700 hover:text-green-900"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+                {couponError && (
+                  <p className="text-sm text-red-500">{couponError}</p>
+                )}
+              </div>
+
+              <div className="border-t border-orange-200 pt-4">
                 <div className="flex justify-between items-center mb-4">
-                  <span className="font-bold text-gray-900 dark:text-white">{t('total')}:</span>
+                  <span className="font-bold text-lg">Total:</span>
                   <span className="font-bold text-xl text-orange-600">${getFinalTotal().toFixed(2)}</span>
                 </div>
                 <Button
@@ -1018,405 +1022,290 @@ export default function Order() {
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Desktop Cart Popup */}
-      {cart.length > 0 && showCartPopup && (
-        <div className="cart-popup hidden md:block fixed top-20 right-4 z-50 w-80 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 max-h-96 overflow-y-auto animate-fade-in">
-          <div className="p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-xl flex items-center text-gray-900 dark:text-white">
-                <ShoppingCart className="w-6 h-6 mr-2 text-orange-500" />
-                {t('cart')} ({getCartItemCount()})
-              </h3>
-              <button
-                onClick={() => setShowCartPopup(false)}
-                className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              >
-                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
-              {cart.map((item) => (
-                <div key={item.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900 dark:text-white">{item.name}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Qty: {item.quantity}</p>
-                  </div>
+        {/* Checkout Modal */}
+        <Dialog open={showCheckout} onOpenChange={setShowCheckout}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Complete Your Order</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {/* Table Number Display */}
+              {tableNumber && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-gray-900 dark:text-white">${(item.price * item.quantity).toFixed(2)}</span>
-                    <button
-                      onClick={() => removeFromCart(item.id)}
-                      className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20"
-                    >
-                      <Minus className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            {/* Coupon Section */}
-            {appliedCoupon ? (
-              <div className="flex items-center justify-between mb-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                <span className="text-green-600 font-semibold text-sm">Coupon {appliedCoupon} applied!</span>
-                <Button size="sm" variant="ghost" className="text-red-500 h-6 px-2" onClick={handleRemoveCoupon}>Remove</Button>
-              </div>
-            ) : (
-              <div className="flex gap-2 mb-3">
-                <Input
-                  value={coupon}
-                  onChange={e => setCoupon(e.target.value)}
-                  placeholder="Promo code"
-                  className="flex-1 text-sm"
-                />
-                <Button size="sm" onClick={handleApplyCoupon} className="bg-orange-500 hover:bg-orange-600">Apply</Button>
-              </div>
-            )}
-            {couponError && <p className="text-xs text-red-500 mb-3">{couponError}</p>}
-            
-            {/* Discount */}
-            {discount > 0 && (
-              <div className="flex justify-between items-center text-green-600 font-semibold mb-3">
-                <span>Discount:</span>
-                <span>- ${discount.toFixed(2)}</span>
-              </div>
-            )}
-            
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-              <div className="flex justify-between items-center mb-4">
-                <span className="font-bold text-gray-900 dark:text-white">{t('total')}:</span>
-                <span className="font-bold text-xl text-orange-600">${getFinalTotal().toFixed(2)}</span>
-              </div>
-              <Button
-                onClick={() => {
-                  setShowCartPopup(false);
-                  setShowCheckout(true);
-                }}
-                className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-3 rounded-lg shadow-lg"
-              >
-                {t('checkout')}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Checkout Modal */}
-      <Dialog open={showCheckout} onOpenChange={setShowCheckout}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Complete Your Order</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {/* Table Number Display */}
-            {tableNumber && (
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-blue-600 dark:text-blue-400">📍</span>
-                  <span className="font-medium text-blue-800 dark:text-blue-200">
-                    Table {tableNumber}
-                  </span>
-                </div>
-                <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
-                  Your order will be delivered to your table
-                </p>
-              </div>
-            )}
-
-            {/* Order Summary */}
-            <div className="space-y-2">
-              <h3 className="font-semibold text-lg">Order Summary</h3>
-              <div className="max-h-40 overflow-y-auto space-y-2">
-                {cart.map((item, index) => (
-                  <div key={index} className="flex justify-between items-center text-sm">
-                    <span className="flex-1">
-                      {item.quantity}x {item.name}
+                    <span className="text-blue-600">📍</span>
+                    <span className="font-medium text-blue-800">
+                      Table {tableNumber}
                     </span>
-                    <span className="font-medium">${(item.price * item.quantity).toFixed(2)}</span>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Optional Notes */}
-            <div>
-              <Label htmlFor="notes">Special Instructions (Optional)</Label>
-              <Textarea
-                id="notes"
-                value={customerInfo.notes}
-                onChange={(e) => setCustomerInfo(prev => ({ ...prev, notes: e.target.value }))}
-                placeholder="Any special requests or dietary requirements..."
-                rows={3}
-              />
-            </div>
-
-            {/* Total and Place Order */}
-            <div className="border-t pt-4 space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="font-bold text-lg">Total:</span>
-                <span className="font-bold text-xl text-orange-600">${getFinalTotal().toFixed(2)}</span>
-              </div>
-              
-              {appliedCoupon && (
-                <div className="flex justify-between items-center text-sm text-green-600">
-                  <span>Discount Applied:</span>
-                  <span>-${discount.toFixed(2)}</span>
+                  <p className="text-sm text-blue-600 mt-1">
+                    Your order will be delivered to your table
+                  </p>
                 </div>
               )}
-              
-              <Button
-                onClick={handlePlaceOrder}
-                disabled={placingOrder}
-                className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-3 rounded-lg shadow-lg"
-              >
-                {placingOrder ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Placing Order...
-                  </>
-                ) : (
-                  `Place Order - $${getFinalTotal().toFixed(2)}`
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
-      {/* Item Details Dialog */}
-      <Dialog open={showItemDetails} onOpenChange={setShowItemDetails}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold">{selectedItem?.name}</DialogTitle>
-          </DialogHeader>
-          {selectedItem && (
-            <div className="space-y-6">
-              {/* Item Image */}
-              <div className="relative h-64 rounded-lg overflow-hidden">
-                {selectedItem.image_url ? (
-                  <img
-                    src={selectedItem.image_url}
-                    alt={selectedItem.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-orange-100 to-red-100 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center">
-                    <span className="text-8xl">🍽️</span>
-                  </div>
-                )}
+              {/* Order Summary */}
+              <div className="space-y-2">
+                <h3 className="font-semibold text-lg">Order Summary</h3>
+                <div className="max-h-40 overflow-y-auto space-y-2">
+                  {cart.map((item, index) => (
+                    <div key={index} className="flex justify-between items-center text-sm">
+                      <span className="flex-1">
+                        {item.quantity}x {item.name}
+                      </span>
+                      <span className="font-medium">${(item.price * item.quantity).toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              {/* Item Description */}
+              {/* Optional Notes */}
               <div>
-                <h3 className="font-semibold text-lg mb-2">Description</h3>
-                <p className="text-gray-600 dark:text-gray-400">{selectedItem.description}</p>
+                <Label htmlFor="notes">Special Instructions (Optional)</Label>
+                <Textarea
+                  id="notes"
+                  value={customerInfo.notes}
+                  onChange={(e) => setCustomerInfo(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="Any special requests or dietary requirements..."
+                  rows={3}
+                />
               </div>
 
-              {/* Customization Section */}
-              <div className="space-y-4">
-                <h3 className="font-semibold text-lg">Customize Your Order</h3>
+              {/* Total and Place Order */}
+              <div className="border-t pt-4 space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-lg">Total:</span>
+                  <span className="font-bold text-xl text-orange-600">${getFinalTotal().toFixed(2)}</span>
+                </div>
                 
-                {/* Add-ons */}
-                <div>
-                  <h4 className="font-medium mb-3">Add-ons</h4>
-                  <div className="grid grid-cols-1 gap-3">
-                    {ADDONS.map((addon) => (
-                      <label key={addon.id} className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4 text-orange-500 border-gray-300 rounded focus:ring-orange-500"
-                          />
-                          <span className="font-medium">{addon.name}</span>
-                        </div>
-                        <span className="text-orange-600 font-semibold">+${addon.price.toFixed(2)}</span>
-                      </label>
-                    ))}
+                {appliedCoupon && (
+                  <div className="flex justify-between items-center text-sm text-green-600">
+                    <span>Discount Applied:</span>
+                    <span>-${discount.toFixed(2)}</span>
                   </div>
-                </div>
-
-                {/* Variants */}
-                <div>
-                  <h4 className="font-medium mb-3">Size & Style</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    {VARIANTS.map((variant) => (
-                      <label key={variant.id} className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="radio"
-                            name="variant"
-                            className="w-4 h-4 text-orange-500 border-gray-300 focus:ring-orange-500"
-                            defaultChecked={variant.id === 'regular'}
-                          />
-                          <span className="font-medium">{variant.name}</span>
-                        </div>
-                        {variant.price > 0 && (
-                          <span className="text-orange-600 font-semibold">+${variant.price.toFixed(2)}</span>
-                        )}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Special Instructions */}
-                <div>
-                  <h4 className="font-medium mb-3">Special Instructions</h4>
-                  <Textarea
-                    placeholder="Any special requests or dietary requirements..."
-                    className="w-full"
-                    rows={3}
-                  />
-                </div>
-              </div>
-
-              {/* Price Summary */}
-              <div className="border-t pt-4">
-                <div className="flex justify-between items-center mb-4">
-                  <span className="text-lg font-semibold">Total Price:</span>
-                  <span className="text-2xl font-bold text-orange-600">${selectedItem.price.toFixed(2)}</span>
-                </div>
+                )}
+                
                 <Button
-                  onClick={() => {
-                    addToCart(selectedItem);
-                    setShowItemDetails(false);
-                  }}
+                  onClick={handlePlaceOrder}
+                  disabled={placingOrder}
                   className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-3 rounded-lg shadow-lg"
                 >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add to Cart
+                  {placingOrder ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Placing Order...
+                    </>
+                  ) : (
+                    `Place Order - $${getFinalTotal().toFixed(2)}`
+                  )}
                 </Button>
               </div>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
 
-      {/* Authentication Modal */}
-      <Dialog open={showAuth} onOpenChange={setShowAuth}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>{authMode === 'login' ? 'Login' : 'Register'}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {authMode === 'register' && (
-              <div>
-                <Label>Name</Label>
-                <Input
-                  value={authName}
-                  onChange={e => setAuthName(e.target.value)}
-                  placeholder="Your name"
-                />
-              </div>
-            )}
-            <div>
-              <Label>Email</Label>
-              <Input
-                value={authEmail}
-                onChange={e => setAuthEmail(e.target.value)}
-                type="email"
-                placeholder="your@email.com"
-              />
-            </div>
-            <div>
-              <Label>Password</Label>
-              <Input
-                value={authPassword}
-                onChange={e => setAuthPassword(e.target.value)}
-                type="password"
-                placeholder="••••••••"
-              />
-            </div>
-            {authError && <p className="text-sm text-red-500">{authError}</p>}
-            <Button onClick={handleAuth} className="w-full">
-              {authMode === 'login' ? 'Login' : 'Register'}
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
-              className="w-full"
-            >
-              {authMode === 'login' ? 'Need an account? Register' : 'Already have an account? Login'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Order History Modal */}
-      <Dialog open={showOrders} onOpenChange={setShowOrders}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>My Orders</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {orderHistory.length === 0 ? (
-              <div className="text-center py-8">
-                <div className="text-6xl mb-4">📋</div>
-                <p className="text-gray-500 dark:text-gray-400">No orders yet.</p>
-              </div>
-            ) : (
-              orderHistory.map((order, i) => (
-                <div key={i} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-bold">Order #{order.id?.slice(-8) || i + 1}</span>
-                    <span className="text-sm text-gray-500">{new Date(order.placedAt).toLocaleDateString()}</span>
-                  </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                    {order.items?.map((item: any, idx: number) => (
-                      <span key={idx} className="inline-block bg-white dark:bg-gray-700 px-2 py-1 rounded mr-2 mb-1">
-                        {item.name} x{item.quantity}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-lg">${order.total?.toFixed(2)}</span>
-                    <span className="text-sm text-green-600 font-semibold">{order.status || 'Completed'}</span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Order Tracking Dialog */}
-      {lastOrder && (
-        <Dialog open={showTracking} onOpenChange={setShowTracking}>
+        {/* Item Details Modal */}
+        <Dialog open={showItemDetails} onOpenChange={setShowItemDetails}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Order Tracking</DialogTitle>
+              <DialogTitle>{selectedItem?.name}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <span className="font-bold">Order #</span>
-                <span className="text-orange-600 font-mono">{lastOrder.id.slice(-8)}</span>
+              <p className="text-gray-600">{selectedItem?.description}</p>
+              
+              {/* Add-ons */}
+              <div>
+                <h4 className="font-semibold mb-2">Add-ons</h4>
+                <div className="space-y-2">
+                  {ADDONS.map((addon) => (
+                    <label key={addon.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          className="rounded"
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedAddons([...selectedAddons, addon.name]);
+                            } else {
+                              setSelectedAddons(selectedAddons.filter(a => a !== addon.name));
+                            }
+                          }}
+                        />
+                        <span>{addon.name}</span>
+                      </div>
+                      <span className="text-orange-600 font-semibold">+${addon.price.toFixed(2)}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold">Status:</span>
-                <span className="text-green-700 font-semibold animate-pulse">{getStatusLabel(getOrderStatus(lastOrder))}</span>
+
+              {/* Variants */}
+              <div>
+                <h4 className="font-semibold mb-2">Size & Style</h4>
+                <div className="space-y-2">
+                  {VARIANTS.map((variant) => (
+                    <label key={variant.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="variant"
+                          value={variant.name}
+                          checked={selectedVariant === variant.name}
+                          onChange={(e) => setSelectedVariant(e.target.value)}
+                          className="rounded"
+                        />
+                        <span>{variant.name}</span>
+                      </div>
+                      <span className="text-orange-600 font-semibold">+${variant.price.toFixed(2)}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold">ETA:</span>
-                <span className="text-blue-600 font-semibold">{getEta(lastOrder)}</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-3">
-                <div
-                  className="bg-gradient-to-r from-orange-400 to-pink-400 h-3 rounded-full transition-all duration-500"
-                  style={{ width: `${getProgress(lastOrder)}%` }}
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold">Total:</span>
-                <span className="text-lg font-bold">${lastOrder.total.toFixed(2)}</span>
-              </div>
-              <Button className="w-full mt-2" onClick={() => setShowTracking(false)}>Close</Button>
+
+              <Button
+                onClick={() => {
+                  if (selectedItem) {
+                    addToCart(selectedItem, '', selectedAddons, selectedVariant);
+                    setShowItemDetails(false);
+                    setSelectedAddons([]);
+                    setSelectedVariant('regular');
+                  }
+                }}
+                className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold"
+              >
+                Add to Cart - ${selectedItem ? (selectedItem.price + 
+                  selectedAddons.reduce((sum, addon) => sum + ADDONS.find(a => a.name === addon)?.price || 0, 0) +
+                  (selectedVariant !== 'regular' ? VARIANTS.find(v => v.name === selectedVariant)?.price || 0 : 0)
+                ).toFixed(2) : '0.00'}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
-      )}
-    </div>
-  );
-}
+
+        {/* Authentication Modal */}
+        <Dialog open={showAuth} onOpenChange={setShowAuth}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>{authMode === 'login' ? 'Login' : 'Register'}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {authMode === 'register' && (
+                <div>
+                  <Label>Name</Label>
+                  <Input
+                    value={authName}
+                    onChange={e => setAuthName(e.target.value)}
+                    placeholder="Your name"
+                  />
+                </div>
+              )}
+              <div>
+                <Label>Email</Label>
+                <Input
+                  value={authEmail}
+                  onChange={e => setAuthEmail(e.target.value)}
+                  type="email"
+                  placeholder="your@email.com"
+                />
+              </div>
+              <div>
+                <Label>Password</Label>
+                <Input
+                  value={authPassword}
+                  onChange={e => setAuthPassword(e.target.value)}
+                  type="password"
+                  placeholder="••••••••"
+                />
+              </div>
+              {authError && <p className="text-sm text-red-500">{authError}</p>}
+              <Button onClick={handleAuth} className="w-full">
+                {authMode === 'login' ? 'Login' : 'Register'}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
+                className="w-full"
+              >
+                {authMode === 'login' ? 'Need an account? Register' : 'Already have an account? Login'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Order History Modal */}
+        <Dialog open={showOrders} onOpenChange={setShowOrders}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>My Orders</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {orderHistory.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="text-6xl mb-4">📋</div>
+                  <p className="text-gray-500">No orders yet.</p>
+                </div>
+              ) : (
+                orderHistory.map((order, i) => (
+                  <div key={i} className="bg-gray-50 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-bold">Order #{order.id?.slice(-8) || i + 1}</span>
+                      <span className="text-sm text-gray-500">{new Date(order.placedAt).toLocaleDateString()}</span>
+                    </div>
+                    <div className="text-sm text-gray-600 mb-2">
+                      {order.items?.map((item: any, idx: number) => (
+                        <span key={idx} className="inline-block bg-white px-2 py-1 rounded mr-2 mb-1">
+                          {item.name} x{item.quantity}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-lg">${order.total?.toFixed(2)}</span>
+                      <span className="text-sm text-green-600 font-semibold">{order.status || 'Completed'}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Order Tracking Dialog */}
+        {lastOrder && (
+          <Dialog open={showTracking} onOpenChange={setShowTracking}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Order Tracking</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold">Order #</span>
+                  <span className="text-orange-600 font-mono">{lastOrder.id.slice(-8)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold">Status:</span>
+                  <span className="text-green-700 font-semibold animate-pulse">{getStatusLabel(getOrderStatus(lastOrder))}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold">ETA:</span>
+                  <span className="text-blue-600 font-semibold">{getEta(lastOrder)}</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div
+                    className="bg-gradient-to-r from-orange-400 to-pink-400 h-3 rounded-full transition-all duration-500"
+                    style={{ width: `${getProgress(lastOrder)}%` }}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold">Total:</span>
+                  <span className="text-lg font-bold">${lastOrder.total.toFixed(2)}</span>
+                </div>
+                <Button className="w-full mt-2" onClick={() => setShowTracking(false)}>Close</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+      </div>
+    );
+  }
