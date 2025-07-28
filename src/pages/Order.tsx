@@ -44,7 +44,7 @@ interface MenuItem {
   dietary_info?: string[];
   allergens?: string[];
   category_id: string;
-  category: string; // Added for frontend mapping
+  category: string;
 }
 
 interface CartItem {
@@ -62,309 +62,106 @@ export default function Order() {
   const location = useLocation();
   const { toast } = useToast();
   
+  // Extract table number from URL parameters
+  const urlParams = new URLSearchParams(location.search);
+  const tableNumberFromUrl = urlParams.get('table');
+  
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [categories, setCategories] = useState<Category[]>([{ id: 'all', name: 'All Items', description: '', sort_order: -1 }]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showCheckout, setShowCheckout] = useState(false);
+  const [search, setSearch] = useState('');
+  const [showCartPopup, setShowCartPopup] = useState(false);
+  const [showItemDetails, setShowItemDetails] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem('user');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [showAuth, setShowAuth] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authName, setAuthName] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [showOrders, setShowOrders] = useState(false);
+  const [orderHistory, setOrderHistory] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<{[key: string]: any[]}>({});
+  const [reviewText, setReviewText] = useState('');
+  const [reviewRating, setReviewRating] = useState(5);
+  const [submittingReview, setSubmittingReview] = useState(false);
   const [customerInfo, setCustomerInfo] = useState({
     name: '',
     phone: '',
     email: '',
-    tableNumber: '',
+    tableNumber: tableNumberFromUrl || '',
     notes: '',
   });
-  const [tableNumber, setTableNumber] = useState<string | null>(null);
+  const [tableNumber, setTableNumber] = useState<string | null>(tableNumberFromUrl);
   const [placingOrder, setPlacingOrder] = useState(false);
 
-  // Add favorites state and persist in localStorage
-  const [favorites, setFavorites] = useState<string[]>([]);
-  useEffect(() => {
-    const savedFavs = localStorage.getItem('restaurant_favorites');
-    if (savedFavs) setFavorites(JSON.parse(savedFavs));
-  }, []);
-  useEffect(() => {
-    localStorage.setItem('restaurant_favorites', JSON.stringify(favorites));
-  }, [favorites]);
-
-  const toggleFavorite = (itemId: string) => {
-    setFavorites(favs => favs.includes(itemId) ? favs.filter(id => id !== itemId) : [...favs, itemId]);
-  };
-
-  // Persist cart in localStorage
-  useEffect(() => {
-    const savedCart = localStorage.getItem('restaurant_cart');
-    if (savedCart) {
-      setCart(JSON.parse(savedCart));
-    }
-  }, []);
-  useEffect(() => {
-    localStorage.setItem('restaurant_cart', JSON.stringify(cart));
-  }, [cart]);
-
-  const [error, setError] = useState('');
-  const [retryCount, setRetryCount] = useState(0);
-
-  useEffect(() => {
-    let timeout: any;
-    setError('');
-    setLoading(true);
-    timeout = setTimeout(() => {
-      setLoading(false);
-      setError('Request timed out. Please try again.');
-    }, 10000); // 10 seconds
-    loadRestaurantData().finally(() => clearTimeout(timeout));
-    return () => clearTimeout(timeout);
-  // eslint-disable-next-line
-  }, [restaurantId, location.search, retryCount]);
-
-  const loadRestaurantData = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      // Load restaurant info
-      const { data: restaurantData, error: restaurantError } = await supabase
-        .from('restaurants')
-        .select('*')
-        .eq('id', restaurantId)
-        .eq('is_active', true)
-        .single();
-      console.log('Fetched restaurant:', restaurantData, 'Error:', restaurantError);
-      if (restaurantError || !restaurantData) {
-        setError('Restaurant not found.');
-        setLoading(false);
-        return;
-      }
-      setRestaurant(restaurantData);
-      // Load categories
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from('menu_categories')
-        .select('*')
-        .eq('restaurant_id', restaurantId)
-        .eq('is_active', true)
-        .order('sort_order');
-      console.log('Fetched categories:', categoriesData, 'Error:', categoriesError);
-      if (categoriesError) {
-        setError('Failed to load categories.');
-        setLoading(false);
-        return;
-      }
-      setCategories([{ id: 'all', name: t('allItems'), description: '', sort_order: -1 }, ...(categoriesData || [])]);
-      setSelectedCategory('all');
-      // Load menu items
-      const { data: menuData, error: menuError } = await supabase
-        .from('menu_items')
-        .select(`*, menu_categories!inner(name)`)
-        .eq('restaurant_id', restaurantId)
-        .eq('is_available', true)
-        .order('created_at', { ascending: false });
-      console.log('Fetched menu items:', menuData, 'Error:', menuError);
-      if (menuError) {
-        setError('Failed to load menu items.');
-        setLoading(false);
-        return;
-      } else if (!menuData || menuData.length === 0) {
-        setError('No menu items found for this restaurant.');
-        setMenuItems([]);
-        setLoading(false);
-        return;
-      } else {
-        setMenuItems(menuData.map(item => ({
-          ...item,
-          category: item.menu_categories?.name || 'Uncategorized',
-        })));
-      }
-      setError('');
-      setLoading(false);
-    } catch (error) {
-      console.error('Error loading restaurant data:', error);
-      setError('An unexpected error occurred. Please try again.');
-      setLoading(false);
-    }
-  };
-
-  const addToCart = (item: MenuItem, specialInstructions?: string, selectedAddons: string[] = [], selectedVariant: string = 'regular') => {
-    const existingItem = cart.find(cartItem => 
-      cartItem.id === item.id && 
-      cartItem.special_instructions === specialInstructions &&
-      cartItem.addons?.sort().join(',') === selectedAddons.sort().join(',') &&
-      cartItem.variant === selectedVariant
-    );
-
-    if (existingItem) {
-      setCart(cart.map(cartItem =>
-        cartItem.id === item.id && 
-        cartItem.special_instructions === specialInstructions &&
-        cartItem.addons?.sort().join(',') === selectedAddons.sort().join(',') &&
-        cartItem.variant === selectedVariant
-          ? { ...cartItem, quantity: cartItem.quantity + 1 }
-          : cartItem
-      ));
-    } else {
-      setCart([...cart, {
-        id: item.id,
-        name: item.name,
-        price: item.price, // Base price
-        quantity: 1,
-        special_instructions: specialInstructions,
-        addons: selectedAddons,
-        variant: selectedVariant,
-      }]);
-    }
-
-    toast({
-      title: 'Added to Cart',
-      description: `${item.name} added to your order.`,
-    });
-  };
-
-  const removeFromCart = (cartItemId: string, specialInstructions?: string) => {
-    const existingItem = cart.find(cartItem => 
-      cartItem.id === cartItemId && 
-      cartItem.special_instructions === specialInstructions
-    );
-
-    if (existingItem && existingItem.quantity > 1) {
-      setCart(cart.map(cartItem =>
-        cartItem.id === cartItemId && cartItem.special_instructions === specialInstructions
-          ? { ...cartItem, quantity: cartItem.quantity - 1 }
-          : cartItem
-      ));
-    } else {
-      setCart(cart.filter(cartItem => 
-        !(cartItem.id === cartItemId && cartItem.special_instructions === specialInstructions)
-      ));
-    }
-  };
-
-  const getCartTotal = () => {
-    return cart.reduce((total, item) => {
-      const basePrice = item.price;
-      const addonTotal = item.addons?.reduce((sum, id) => {
-        const addon = ADDONS.find(a => a.id === id);
-        return sum + (addon ? addon.price : 0);
-      }, 0) || 0;
-      const variantPrice = VARIANTS.find(v => v.id === item.variant)?.price || 0;
-      return total + (basePrice + addonTotal + variantPrice) * item.quantity;
-    }, 0);
-  };
-
-  const getCartItemCount = () => {
-    return cart.reduce((count, item) => count + item.quantity, 0);
-  };
-
+  // Order tracking state
   const [lastOrder, setLastOrder] = useState<any>(null);
   const [showTracking, setShowTracking] = useState(false);
 
-  // After placing order, save to localStorage and show tracking
-  const handlePlaceOrder = async () => {
-    if (!restaurant || cart.length === 0) return;
+  // On mount, load last order from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('last_order');
+    if (saved) setLastOrder(JSON.parse(saved));
+  }, []);
 
-    if (!customerInfo.name || !customerInfo.phone) {
-      toast({
-        title: 'Missing Information',
-        description: 'Please provide your name and phone number.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      // Create order
-      const { data: orderData, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          restaurant_id: restaurant.id,
-          customer_name: customerInfo.name,
-          customer_phone: customerInfo.phone,
-          customer_email: customerInfo.email || null,
-          table_number: customerInfo.tableNumber || null,
-          total_amount: getFinalTotal(),
-          notes: customerInfo.notes || null,
-          status: 'pending',
-        })
-        .select()
-        .single();
-
-      if (orderError) {
-        console.error('Error creating order:', orderError);
-        toast({
-          title: 'Order Failed',
-          description: 'Failed to place your order. Please try again.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      // Add order items
-      const orderItems = cart.map(item => ({
-        order_id: orderData.id,
-        menu_item_id: item.id,
-        quantity: item.quantity,
-        unit_price: item.price, // Base price
-        total_price: (item.price + (item.addons?.reduce((sum, id) => {
-          const addon = ADDONS.find(a => a.id === id);
-          return sum + (addon ? addon.price : 0);
-        }, 0) || 0) + (VARIANTS.find(v => v.id === item.variant)?.price || 0)) * item.quantity,
-        special_instructions: item.special_instructions || null,
-        addons: item.addons || null,
-        variant: item.variant || null,
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
-
-      if (itemsError) {
-        console.error('Error adding order items:', itemsError);
-        toast({
-          title: 'Order Failed',
-          description: 'Failed to save order items. Please try again.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      toast({
-        title: 'Order Placed!',
-        description: `Your order #${orderData.id.slice(-8)} has been placed successfully.`,
-      });
-
-      // Clear cart and customer info
-      setCart([]);
-      setCustomerInfo({
-        name: '',
-        phone: '',
-        email: '',
-        tableNumber: '',
-        notes: '',
-      });
-      setShowCheckout(false);
-
-      // After successful order:
-      const orderSummary = {
-        id: orderData.id,
-        status: 'pending',
-        placedAt: Date.now(),
-        estReady: Date.now() + 25 * 60 * 1000, // 25 mins from now
-        customer: customerInfo.name,
-        total: getFinalTotal(),
-        restaurant: restaurant.name,
-      };
-      setLastOrder(orderSummary);
-      localStorage.setItem('last_order', JSON.stringify(orderSummary));
-      setShowTracking(true);
-    } catch (error) {
-      console.error('Error placing order:', error);
-      toast({
-        title: 'Error',
-        description: 'An unexpected error occurred. Please try again.',
-        variant: 'destructive',
-      });
+  // Order tracking status logic
+  const getOrderStatus = (order: any) => {
+    if (!order) return 'pending';
+    const now = Date.now();
+    if (now < order.placedAt + 5 * 60 * 1000) return 'pending'; // 0-5 min
+    if (now < order.placedAt + 20 * 60 * 1000) return 'preparing'; // 5-20 min
+    if (now < order.estReady) return 'ready'; // 20-25 min
+    return 'completed';
+  };
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'pending': return 'Order Placed';
+      case 'preparing': return 'Preparing';
+      case 'ready': return 'Ready for Pickup/Delivery';
+      case 'completed': return 'Completed';
+      default: return status;
     }
   };
+  const getProgress = (order: any) => {
+    if (!order) return 0;
+    const now = Date.now();
+    const total = order.estReady - order.placedAt;
+    const elapsed = Math.min(now - order.placedAt, total);
+    return Math.max(0, Math.min(100, (elapsed / total) * 100));
+  };
+  const getEta = (order: any) => {
+    if (!order) return '';
+    const mins = Math.max(0, Math.round((order.estReady - Date.now()) / 60000));
+    return mins > 0 ? `${mins} min${mins > 1 ? 's' : ''}` : 'Ready!';
+  };
+
+  // Dark mode state
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('dark_mode') === 'true';
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('dark_mode', 'true');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('dark_mode', 'false');
+    }
+  }, [darkMode]);
 
   // Coupon state
   const [coupon, setCoupon] = useState('');
@@ -410,59 +207,23 @@ export default function Order() {
 
   const getFinalTotal = () => Math.max(0, getCartTotal() - discount);
 
-  // On mount, load last order from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('last_order');
-    if (saved) setLastOrder(JSON.parse(saved));
-  }, []);
+  // Menu item customization data
+  const ADDONS = [
+    { id: 'cheese', name: 'Extra Cheese', price: 1.5 },
+    { id: 'fries', name: 'French Fries', price: 2.0 },
+    { id: 'drink', name: 'Soft Drink', price: 2.5 },
+    { id: 'sauce', name: 'Extra Sauce', price: 0.5 },
+    { id: 'bacon', name: 'Bacon', price: 3.0 },
+  ];
 
-  // Order tracking status logic
-  const getOrderStatus = (order: any) => {
-    if (!order) return 'pending';
-    const now = Date.now();
-    if (now < order.placedAt + 5 * 60 * 1000) return 'pending'; // 0-5 min
-    if (now < order.placedAt + 20 * 60 * 1000) return 'preparing'; // 5-20 min
-    if (now < order.estReady) return 'ready'; // 20-25 min
-    return 'completed';
-  };
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'pending': return 'Order Placed';
-      case 'preparing': return 'Preparing';
-      case 'ready': return 'Ready for Pickup/Delivery';
-      case 'completed': return 'Completed';
-      default: return status;
-    }
-  };
-  const getProgress = (order: any) => {
-    if (!order) return 0;
-    const now = Date.now();
-    const total = order.estReady - order.placedAt;
-    const elapsed = Math.min(now - order.placedAt, total);
-    return Math.max(0, Math.min(100, (elapsed / total) * 100));
-  };
-  const getEta = (order: any) => {
-    if (!order) return '';
-    const mins = Math.max(0, Math.round((order.estReady - Date.now()) / 60000));
-    return mins > 0 ? `${mins} min${mins > 1 ? 's' : ''}` : 'Ready!';
-  };
+  const VARIANTS = [
+    { id: 'regular', name: 'Regular', price: 0 },
+    { id: 'large', name: 'Large', price: 3.0 },
+    { id: 'spicy', name: 'Spicy', price: 0 },
+    { id: 'mild', name: 'Mild', price: 0 },
+  ];
 
-  const [darkMode, setDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('dark_mode') === 'true';
-    }
-    return false;
-  });
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('dark_mode', 'true');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('dark_mode', 'false');
-    }
-  }, [darkMode]);
-
+  // Multi-language support
   const LANGUAGES = [
     { code: 'en', label: 'English' },
     { code: 'es', label: 'Español' },
@@ -471,96 +232,60 @@ export default function Order() {
     en: {
       allItems: 'All Items',
       favorites: 'Favorites',
-      menuCategories: 'Menu Categories',
-      addToOrder: 'Add to Order',
-      customize: 'Customize',
-      cart: 'Cart',
-      items: 'items',
+      searchPlaceholder: 'Search menu items...',
+      addToCart: 'Add to Cart',
       checkout: 'Checkout',
-      yourOrder: 'Your Order',
       total: 'Total',
-      subtotal: 'Subtotal',
-      discount: 'Discount',
-      coupon: 'Coupon',
-      apply: 'Apply',
-      remove: 'Remove',
       placeOrder: 'Place Order',
       name: 'Name',
       phone: 'Phone',
       email: 'Email (Optional)',
-      tableNumber: 'Table Number (Optional)',
-      notes: 'Special Instructions (Optional)',
-      orderPlaced: 'Order Placed!',
-      orderTracking: 'Order Tracking',
-      status: 'Status',
-      eta: 'ETA',
-      close: 'Close',
-      searchPlaceholder: 'Search menu items...',
-      emptyCart: 'Your cart is empty. Add some delicious items!',
-      noFavorites: 'No favorites yet. Tap the heart on any dish to add it here!',
-      noSearchResults: 'No menu items match your search.',
-      ratingsReviews: 'Ratings & Reviews',
-      submitReview: 'Submit Review',
-      noReviews: 'No reviews yet. Be the first to review!',
+      notes: 'Special Instructions',
       darkMode: 'Dark Mode',
       language: 'Language',
+      cart: 'Cart',
     },
     es: {
       allItems: 'Todos los platos',
       favorites: 'Favoritos',
-      menuCategories: 'Categorías',
-      addToOrder: 'Añadir al pedido',
-      customize: 'Personalizar',
-      cart: 'Carrito',
-      items: 'artículos',
+      searchPlaceholder: 'Buscar en el menú...',
+      addToCart: 'Añadir al carrito',
       checkout: 'Pagar',
-      yourOrder: 'Tu pedido',
       total: 'Total',
-      subtotal: 'Subtotal',
-      discount: 'Descuento',
-      coupon: 'Cupón',
-      apply: 'Aplicar',
-      remove: 'Eliminar',
       placeOrder: 'Realizar pedido',
       name: 'Nombre',
       phone: 'Teléfono',
       email: 'Correo (opcional)',
-      tableNumber: 'Mesa (opcional)',
-      notes: 'Instrucciones especiales (opcional)',
-      orderPlaced: '¡Pedido realizado!',
-      orderTracking: 'Seguimiento de pedido',
-      status: 'Estado',
-      eta: 'Tiempo estimado',
-      close: 'Cerrar',
-      searchPlaceholder: 'Buscar en el menú...',
-      emptyCart: 'Tu carrito está vacío. ¡Agrega algo delicioso!',
-      noFavorites: 'Aún no hay favoritos. ¡Toca el corazón para añadir!',
-      noSearchResults: 'Ningún plato coincide con tu búsqueda.',
-      ratingsReviews: 'Valoraciones y reseñas',
-      submitReview: 'Enviar reseña',
-      noReviews: 'Aún no hay reseñas. ¡Sé el primero!',
+      notes: 'Instrucciones especiales',
       darkMode: 'Modo oscuro',
       language: 'Idioma',
+      cart: 'Carrito',
     },
   };
   const [lang, setLang] = useState(() => localStorage.getItem('lang') || 'en');
   const t = (key: keyof typeof I18N['en']) => I18N[lang][key] || key;
   useEffect(() => { localStorage.setItem('lang', lang); }, [lang]);
 
-  const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('user');
-    return saved ? JSON.parse(saved) : null;
-  });
-  const [showAuth, setShowAuth] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [authEmail, setAuthEmail] = useState('');
-  const [authPassword, setAuthPassword] = useState('');
-  const [authName, setAuthName] = useState('');
-  const [authError, setAuthError] = useState('');
-  const [showOrders, setShowOrders] = useState(false);
-  const [orderHistory, setOrderHistory] = useState<any[]>([]);
+  // Add favorites state and persist in localStorage
+  const [favorites, setFavorites] = useState<string[]>([]);
+  useEffect(() => {
+    const savedFavs = localStorage.getItem('restaurant_favorites');
+    if (savedFavs) setFavorites(JSON.parse(savedFavs));
+  }, []);
+  useEffect(() => {
+    localStorage.setItem('restaurant_favorites', JSON.stringify(favorites));
+  }, [favorites]);
 
-  // Demo: Save user in localStorage
+  const toggleFavorite = (itemId: string) => {
+    setFavorites(favs => favs.includes(itemId) ? favs.filter(id => id !== itemId) : [...favs, itemId]);
+  };
+
+  const openItemDetails = (item: MenuItem) => {
+    setSelectedItem(item);
+    setShowItemDetails(true);
+  };
+
+  // Authentication functions
   const handleAuth = () => {
     setAuthError('');
     if (!authEmail || !authPassword || (authMode === 'register' && !authName)) {
@@ -587,10 +312,12 @@ export default function Order() {
       }
     }
   };
+
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem('user');
   };
+
   // Fetch order history for user (from localStorage for demo)
   useEffect(() => {
     if (user) {
@@ -598,31 +325,298 @@ export default function Order() {
       setOrderHistory(allOrders.filter((o: any) => o.email === user.email));
     }
   }, [user, showOrders]);
+
   // Save each new order to order_history
   const saveOrderToHistory = (order: any) => {
     const allOrders = JSON.parse(localStorage.getItem('order_history') || '[]');
     allOrders.unshift(order);
     localStorage.setItem('order_history', JSON.stringify(allOrders));
   };
-  // After placing order, save to history
+
+  // Persist cart in localStorage
   useEffect(() => {
-    if (lastOrder) {
-      saveOrderToHistory({ ...lastOrder, email: user?.email || customerInfo.email || 'guest', items: cart });
+    const savedCart = localStorage.getItem('restaurant_cart');
+    if (savedCart) {
+      setCart(JSON.parse(savedCart));
     }
-  }, [lastOrder, user, customerInfo.email, cart]);
+  }, []);
+  useEffect(() => {
+    localStorage.setItem('restaurant_cart', JSON.stringify(cart));
+  }, [cart]);
+
+  // Get table number from URL params
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const table = params.get('table');
+    if (table) {
+      setTableNumber(table);
+      setCustomerInfo(prev => ({ ...prev, tableNumber: table }));
+    }
+  }, [location]);
+
+  // Handle clicking outside cart popup
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (showCartPopup && !target.closest('.cart-popup') && !target.closest('.cart-button')) {
+        setShowCartPopup(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showCartPopup]);
+
+  const loadRestaurantData = async () => {
+    if (!restaurantId) {
+      setError('Restaurant ID is required');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      console.log('Loading restaurant data for:', restaurantId);
+      setLoading(true);
+      setError(null);
+
+      // Fetch restaurant
+      const { data: restaurantData, error: restaurantError } = await supabase
+        .from('restaurants')
+        .select('*')
+        .eq('id', restaurantId)
+        .single();
+
+      if (restaurantError) {
+        console.error('Restaurant fetch error:', restaurantError);
+        setError('Restaurant not found');
+        setLoading(false);
+        return;
+      }
+
+      if (!restaurantData) {
+        setError('Restaurant not found');
+        setLoading(false);
+        return;
+      }
+
+      console.log('Fetched restaurant:', restaurantData);
+      setRestaurant(restaurantData);
+
+      // Fetch categories
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('menu_categories')
+        .select('*')
+        .eq('restaurant_id', restaurantId)
+        .order('sort_order');
+
+      if (categoriesError) {
+        console.error('Categories fetch error:', categoriesError);
+        setError('Failed to load categories');
+        setLoading(false);
+        return;
+      }
+
+      console.log('Fetched categories:', categoriesData);
+      setCategories(prev => [...prev, ...(categoriesData || [])]);
+
+      // Fetch menu items with category names
+      const { data: menuItemsData, error: menuItemsError } = await supabase
+        .from('menu_items')
+        .select(`
+          *,
+          menu_categories!inner(name)
+        `)
+        .eq('restaurant_id', restaurantId)
+        .eq('is_available', true)
+        .order('created_at');
+
+      if (menuItemsError) {
+        console.error('Menu items fetch error:', menuItemsError);
+        setError('Failed to load menu items');
+        setLoading(false);
+        return;
+      }
+
+      console.log('Fetched menu items:', menuItemsData);
+      
+      // Map the data to include category names
+      const mappedMenuItems = (menuItemsData || []).map(item => ({
+        ...item,
+        category: item.menu_categories?.name || 'Uncategorized'
+      }));
+
+      setMenuItems(mappedMenuItems);
+      setLoading(false);
+
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      setError('An unexpected error occurred');
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadRestaurantData();
+  }, [restaurantId]);
+
+  const addToCart = (item: MenuItem, specialInstructions?: string, selectedAddons: string[] = [], selectedVariant: string = 'regular') => {
+    const cartItemId = `${item.id}-${specialInstructions || 'default'}-${selectedAddons.join('-')}-${selectedVariant}`;
+    
+    setCart(prevCart => {
+      const existingItem = prevCart.find(cartItem => cartItem.id === cartItemId);
+      
+      if (existingItem) {
+        return prevCart.map(cartItem =>
+          cartItem.id === cartItemId
+            ? { ...cartItem, quantity: cartItem.quantity + 1 }
+            : cartItem
+        );
+      } else {
+        const newItem: CartItem = {
+          id: cartItemId,
+          name: item.name,
+          price: item.price,
+          quantity: 1,
+          special_instructions: specialInstructions,
+          addons: selectedAddons,
+          variant: selectedVariant,
+        };
+        return [...prevCart, newItem];
+      }
+    });
+
+    toast({
+      title: "Added to cart",
+      description: `${item.name} has been added to your cart`,
+    });
+  };
+
+  const removeFromCart = (cartItemId: string, specialInstructions?: string) => {
+    setCart(prevCart => prevCart.filter(item => item.id !== cartItemId));
+  };
+
+  const getCartTotal = () => {
+    return cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+  };
+
+  const getCartItemCount = () => {
+    return cart.reduce((count, item) => count + item.quantity, 0);
+  };
+
+  const handlePlaceOrder = async () => {
+    if (!restaurant) {
+      toast({
+        title: "Error",
+        description: "Restaurant information not found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setPlacingOrder(true);
+
+    try {
+      // Auto-generate customer info based on table number
+      const customerName = tableNumber ? `Table ${tableNumber} Guest` : 'Guest';
+      const customerPhone = tableNumber ? `Table-${tableNumber}` : 'N/A';
+      
+      const orderData = {
+        restaurant_id: restaurant.id,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        customer_email: customerInfo.email || 'guest@restaurant.com',
+        table_number: tableNumber || customerInfo.tableNumber || 'Unknown',
+        notes: customerInfo.notes,
+        total_amount: getFinalTotal(),
+        status: 'pending',
+        order_items: cart.map(item => ({
+          menu_item_id: item.id.split('-')[0], // Extract original menu item ID
+          quantity: item.quantity,
+          price: item.price,
+          special_instructions: item.special_instructions,
+          addons: item.addons,
+          variant: item.variant,
+        })),
+      };
+
+      const { data, error } = await supabase
+        .from('orders')
+        .insert([orderData])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Order creation error:', error);
+        toast({
+          title: "Order failed",
+          description: "Failed to place order. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Order placed successfully!",
+        description: `Your order #${data.id.slice(-8)} has been placed. We'll bring it to your table when ready.`,
+      });
+
+      // Clear cart
+      setCart([]);
+      setShowCheckout(false);
+      setCustomerInfo({
+        name: '',
+        phone: '',
+        email: '',
+        tableNumber: tableNumber || '',
+        notes: '',
+      });
+
+      // Save order to history
+      const orderSummary = {
+        id: data.id,
+        status: 'pending',
+        placedAt: Date.now(),
+        estReady: Date.now() + 25 * 60 * 1000, // 25 mins from now
+        customer: customerName,
+        total: getFinalTotal(),
+        restaurant: restaurant.name,
+        items: cart,
+        email: user?.email || customerInfo.email || 'guest',
+        tableNumber: tableNumber || 'Unknown',
+      };
+      saveOrderToHistory(orderSummary);
+
+    } catch (error) {
+      console.error('Order error:', error);
+      toast({
+        title: "Order failed",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setPlacingOrder(false);
+    }
+  };
+
+  // Filter items based on selected category and search
+  const itemsToShow = menuItems.filter(item => {
+    const categoryMatch = selectedCategory === 'all' || selectedCategory === 'favorites' 
+      ? (selectedCategory === 'all' ? true : favorites.includes(item.id))
+      : item.category === selectedCategory;
+    const searchMatch = !search.trim() || 
+      item.name.toLowerCase().includes(search.trim().toLowerCase()) ||
+      item.description.toLowerCase().includes(search.trim().toLowerCase());
+    return categoryMatch && searchMatch;
+  });
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading menu...</p>
-          {error && (
-            <div className="mt-6 text-red-500 animate-fade-in">
-              <p>{error}</p>
-              <Button className="mt-2" onClick={() => setRetryCount(c => c + 1)}>Retry</Button>
-            </div>
-          )}
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <p className="text-lg font-semibold text-gray-700">Loading menu...</p>
         </div>
       </div>
     );
@@ -630,11 +624,14 @@ export default function Order() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-foreground mb-2">Error</h1>
-          <p className="text-red-500 mb-4">{error}</p>
-          <Button onClick={() => setRetryCount(c => c + 1)}>Retry</Button>
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="text-red-500 text-6xl mb-4">🍽️</div>
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">Oops!</h1>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <Button onClick={loadRestaurantData} className="bg-orange-500 hover:bg-orange-600">
+            Try Again
+          </Button>
         </div>
       </div>
     );
@@ -642,374 +639,753 @@ export default function Order() {
 
   if (!restaurant) {
     return (
-      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-foreground mb-2">Restaurant Not Found</h1>
-          <p className="text-muted-foreground">This restaurant is not available.</p>
+          <p className="text-lg font-semibold text-gray-700">Restaurant not found</p>
         </div>
       </div>
     );
   }
 
-  // Add a 'Favorites' tab/button to categories
-  const categoriesWithFav = [
-    { id: 'favorites', name: 'Favorites', description: '', sort_order: -2 },
-    ...categories
-  ];
-
-  const [search, setSearch] = useState('');
-
-  // Update itemsToShow logic to support search
-  const filteredByCategory = selectedCategory === 'all'
-    ? menuItems
-    : selectedCategory === 'favorites'
-      ? menuItems.filter(item => favorites.includes(item.id))
-      : menuItems.filter(item => item.category_id === selectedCategory);
-  const itemsToShow = search.trim()
-    ? filteredByCategory.filter(item =>
-        item.name.toLowerCase().includes(search.trim().toLowerCase()) ||
-        item.description.toLowerCase().includes(search.trim().toLowerCase())
-      )
-    : filteredByCategory;
-
   return (
-    <div className="min-h-screen bg-gradient-subtle dark:bg-gradient-to-br dark:from-gray-900 dark:to-gray-800">
-      <div className="container mx-auto px-4 py-8">
-        {/* Restaurant Header */}
-        <div className="relative mb-8 rounded-2xl overflow-hidden shadow-lg">
-          <div className="h-48 md:h-64 w-full bg-gradient-to-r from-orange-100 to-pink-100 flex items-end justify-center">
-            {restaurant.cover_image_url ? (
-              <img src={restaurant.cover_image_url} alt="cover" className="absolute inset-0 w-full h-full object-cover opacity-70" />
-            ) : null}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-            <div className="relative z-10 flex flex-col items-center w-full pb-6">
-              <div className="w-24 h-24 rounded-full bg-white shadow-lg flex items-center justify-center mb-2 overflow-hidden border-4 border-white">
-                {restaurant.logo_url ? (
-                  <img src={restaurant.logo_url} alt="logo" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-4xl">🍽️</span>
-                )}
-              </div>
-              <h1 className="text-3xl md:text-4xl font-extrabold text-white drop-shadow mb-1">{restaurant.name}</h1>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="bg-green-600 text-white text-xs px-2 py-0.5 rounded font-bold">{restaurant.rating || '4.5'} ★</span>
-                <span className="text-white text-xs">{restaurant.cuisines?.join(', ') || 'Multi-cuisine'}</span>
-              </div>
-              <p className="text-white text-sm opacity-90 mb-1">{restaurant.description}</p>
-              <p className="text-white text-xs opacity-80">{restaurant.address}</p>
-            </div>
-          </div>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 dark:from-gray-900 dark:to-gray-800">
+      {/* Top Navigation Bar */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between px-4 py-3">
+          {/* Left - Back Button */}
+          <button 
+            onClick={() => window.history.back()}
+            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
 
-        {tableNumber && (
-          <div className="mb-4">
-            <Badge variant="outline">Table: {tableNumber}</Badge>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Categories Navigation */}
-          <div className="lg:col-span-1">
-            <Card>
-              <CardHeader>
-                <CardTitle>Menu Categories</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 px-0">
-                <div className="flex lg:flex-col gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-orange-200 px-2">
-                  {categoriesWithFav.map((category) => (
-                    <Button
-                      key={category.id}
-                      variant={selectedCategory === category.id ? 'default' : 'ghost'}
-                      className="min-w-[120px] flex-shrink-0 justify-start"
-                      onClick={() => setSelectedCategory(category.id)}
-                    >
-                      {category.name}
-                      {category.id === 'favorites' && (
-                        <Heart className="w-4 h-4 ml-1 text-pink-500" fill={selectedCategory === 'favorites' ? 'currentColor' : 'none'} />
-                      )}
-                    </Button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Cart Summary */}
-            {cart.length > 0 ? (
-              <div className="sticky top-24 z-20 lg:static lg:top-auto lg:z-auto md:static md:top-auto md:z-auto">
-                <Card className="mt-4 shadow-xl border-2 border-orange-100 animate-fade-in dark:bg-gray-900 dark:border-gray-700">
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      <span>Your Order</span>
-                      <Badge variant="secondary">{getCartItemCount()} items</Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2 mb-4">
-                      {cart.map((item, index) => (
-                        <div key={`${item.id}-${index}`} className="flex justify-between items-center group">
-                          <div className="flex-1">
-                            <p className="font-medium">{item.name}</p>
-                            {item.special_instructions && (
-                              <p className="text-xs text-muted-foreground">
-                                Note: {item.special_instructions}
-                              </p>
-                            )}
-                            {item.addons && item.addons.length > 0 && (
-                              <p className="text-xs text-muted-foreground">
-                                Addons: {item.addons.join(', ')}
-                              </p>
-                            )}
-                            {item.variant && (
-                              <p className="text-xs text-muted-foreground">
-                                Variant: {item.variant}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-6 w-6 p-0"
-                              onClick={() => removeFromCart(item.id, item.special_instructions)}
-                            >
-                              <Minus className="w-3 h-3" />
-                            </Button>
-                            <span className="text-sm font-medium w-8 text-center">{item.quantity}</span>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-6 w-6 p-0"
-                              onClick={() => {
-                                const menuItem = menuItems.find(mi => mi.id === item.id);
-                                if (menuItem) addToCart(menuItem, item.special_instructions, item.addons || [], item.variant || 'regular');
-                              }}
-                            >
-                              <Plus className="w-3 h-3" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-6 w-6 p-0 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={() => setCart(cart.filter((c, i) => i !== index))}
-                              title="Remove"
-                            >
-                              ×
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="border-t pt-4">
-                      <div className="flex justify-between items-center font-bold">
-                        <span>Subtotal:</span>
-                        <span>${getCartTotal().toFixed(2)}</span>
-                      </div>
-                      {/* Coupon input */}
-                      {appliedCoupon ? (
-                        <div className="flex items-center justify-between mt-2 animate-fade-in">
-                          <span className="text-green-600 font-semibold">Coupon {appliedCoupon} applied!</span>
-                          <Button size="sm" variant="ghost" className="text-red-500" onClick={handleRemoveCoupon}>Remove</Button>
-                        </div>
-                      ) : (
-                        <div className="flex gap-2 mt-2 animate-fade-in">
-                          <Input
-                            value={coupon}
-                            onChange={e => setCoupon(e.target.value)}
-                            placeholder="Promo code"
-                            className="flex-1"
-                            size={10}
-                          />
-                          <Button size="sm" onClick={handleApplyCoupon}>Apply</Button>
-                        </div>
-                      )}
-                      {couponError && <p className="text-xs text-red-500 mt-1 animate-fade-in">{couponError}</p>}
-                      {/* Discount */}
-                      {discount > 0 && (
-                        <div className="flex justify-between items-center text-green-600 font-semibold mt-2 animate-fade-in">
-                          <span>Discount:</span>
-                          <span>- ${discount.toFixed(2)}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between items-center font-bold text-lg mt-2">
-                        <span>Total:</span>
-                        <span>${getFinalTotal().toFixed(2)}</span>
-                      </div>
-                      <Button 
-                        className="w-full mt-4 bg-gradient-to-r from-orange-400 to-pink-400 text-white font-bold shadow-lg hover:from-orange-500 hover:to-pink-500"
-                        onClick={() => setShowCheckout(true)}
-                      >
-                        <ShoppingCart className="w-4 h-4 mr-2" />
-                        Checkout
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-                {/* On mobile, show a floating cart summary at the bottom */}
-                <div className="fixed bottom-0 left-0 right-0 z-40 block lg:hidden md:hidden">
-                  <div className="bg-gradient-to-r from-orange-400 to-pink-400 text-white flex items-center justify-between px-4 py-3 shadow-xl rounded-t-2xl">
-                    <span className="font-bold">Cart: {getCartItemCount()} items</span>
-                    <span className="font-bold">${getFinalTotal().toFixed(2)}</span>
-                    <Button size="sm" className="ml-2 bg-white/80 text-orange-600 font-bold" onClick={() => setShowCheckout(true)}>
-                      Checkout
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="mt-4 text-center text-muted-foreground animate-fade-in">
-                <Card className="p-6">
-                  <ShoppingCart className="w-8 h-8 mx-auto mb-2 text-orange-400" />
-                  <p>Your cart is empty. Add some delicious items!</p>
-                </Card>
-              </div>
-            )}
-          </div>
-
-          {/* Menu Items */}
-          <div className="lg:col-span-3">
-            <div className="mb-6 flex items-center gap-2">
+          {/* Center - Search Bar */}
+          <div className="flex-1 max-w-md mx-4">
+            <div className="relative">
               <Input
                 value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search menu items..."
-                className="max-w-md"
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t('searchPlaceholder')}
+                className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-full focus:ring-2 focus:ring-orange-500"
               />
-              {search && (
-                <Button size="sm" variant="ghost" onClick={() => setSearch('')}>Clear</Button>
-              )}
+              <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
             </div>
-            <div className="mb-4">
-              <h2 className="text-2xl font-bold">
-                {categories.find(cat => cat.id === selectedCategory)?.name || 'Menu Items'}
-              </h2>
-              <p className="text-muted-foreground">
-                {categories.find(cat => cat.id === selectedCategory)?.description}
-              </p>
-            </div>
+          </div>
 
-            {selectedCategory === 'favorites' && itemsToShow.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">No favorites yet. Tap the heart on any dish to add it here!</p>
-              </div>
-            )}
-            {itemsToShow.length === 0 && search && (
-              <div className="text-center py-12 animate-fade-in">
-                <p className="text-muted-foreground">No menu items match your search.</p>
-              </div>
-            )}
-            {itemsToShow.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">No items available in this category.</p>
+          {/* Right - Cart Icon with Badge */}
+          <div className="relative flex items-center gap-2">
+            {/* User Profile / Login */}
+            {user ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowOrders(true)}
+                  className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  title="Order History"
+                >
+                  <svg className="w-5 h-5 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{user.name}</span>
+                  <button
+                    onClick={handleLogout}
+                    className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    title="Logout"
+                  >
+                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {itemsToShow.map((item) => (
-                  <MenuItemCard 
-                    key={item.id} 
-                    item={item} 
-                    onAddToCart={addToCart}
-                  />
-                ))}
+              <button
+                onClick={() => setShowAuth(true)}
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                title="Login"
+              >
+                <svg className="w-5 h-5 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </button>
+            )}
+            
+            {/* Cart Icon */}
+            <button
+              onClick={() => setShowCartPopup(!showCartPopup)}
+              className="cart-button p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
+            >
+              <ShoppingCart className="w-6 h-6 text-gray-700 dark:text-gray-300" />
+              {cart.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                  {getCartItemCount()}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Restaurant Header */}
+      <div className="relative h-80 bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 mt-16">
+        <div className="absolute inset-0 bg-black bg-opacity-30"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"></div>
+        <div className="relative z-10 h-full flex items-center justify-center text-white">
+          <div className="text-center max-w-2xl px-4">
+            <div className="mb-4">
+              <div className="w-20 h-20 mx-auto mb-4 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                <span className="text-3xl">🍽️</span>
               </div>
+            </div>
+            <h1 className="text-4xl md:text-5xl font-bold mb-3 drop-shadow-lg">{restaurant.name}</h1>
+            <p className="text-lg md:text-xl opacity-95 mb-2 drop-shadow-md">{restaurant.description}</p>
+            {restaurant.address && (
+              <p className="text-sm opacity-80 drop-shadow-sm flex items-center justify-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                {restaurant.address}
+              </p>
             )}
           </div>
         </div>
       </div>
 
-      {/* Checkout Dialog */}
+      {/* Dark Mode Toggle and Language Selector */}
+      <div className="fixed top-20 right-4 z-40 flex gap-2 items-center">
+        <Button
+          variant="ghost"
+          className="rounded-full p-2 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur border border-gray-200 dark:border-gray-700"
+          onClick={() => setDarkMode(d => !d)}
+          aria-label={t('darkMode')}
+        >
+          {darkMode ? <Sun className="w-5 h-5 text-yellow-400" /> : <Moon className="w-5 h-5 text-gray-700" />}
+        </Button>
+        <select
+          value={lang}
+          onChange={e => setLang(e.target.value)}
+          className="rounded-full p-2 bg-white/90 dark:bg-gray-800/90 shadow-lg border border-gray-200 dark:border-gray-700 text-sm backdrop-blur"
+          aria-label={t('language')}
+        >
+          {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+        </select>
+      </div>
+
+      {/* Category Navigation */}
+      <div className="px-4 py-6">
+        <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
+          {categories.map((category) => (
+            <button
+              key={category.id}
+              onClick={() => setSelectedCategory(category.name)}
+              className={`px-6 py-3 rounded-full whitespace-nowrap transition-all duration-200 font-medium ${
+                selectedCategory === category.name
+                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30'
+                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-orange-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
+              }`}
+            >
+              {category.name}
+            </button>
+          ))}
+          <button
+            onClick={() => setSelectedCategory('favorites')}
+            className={`px-6 py-3 rounded-full whitespace-nowrap transition-all duration-200 font-medium flex items-center gap-2 ${
+              selectedCategory === 'favorites'
+                ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30'
+                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-orange-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
+            }`}
+          >
+            <Heart className="w-4 h-4" />
+            Favorites
+          </button>
+        </div>
+
+        {/* Menu Items */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {itemsToShow.map((item) => (
+            <Card key={item.id} className="group overflow-hidden hover:shadow-xl transition-all duration-300 border-0 bg-white dark:bg-gray-800 shadow-lg hover:-translate-y-1">
+              <div className="relative">
+                {item.image_url ? (
+                  <img
+                    src={item.image_url}
+                    alt={item.name}
+                    className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                ) : (
+                  <div className="w-full h-48 bg-gradient-to-br from-orange-100 to-red-100 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
+                    <span className="text-6xl">🍽️</span>
+                  </div>
+                )}
+                <div className="absolute top-3 right-3">
+                  <button
+                    onClick={() => toggleFavorite(item.id)}
+                    className={`p-2 rounded-full transition-all duration-200 ${
+                      favorites.includes(item.id)
+                        ? 'bg-red-500 text-white shadow-lg'
+                        : 'bg-white/90 dark:bg-gray-800/90 text-gray-400 hover:text-red-500 backdrop-blur'
+                    }`}
+                  >
+                    <Heart className="w-5 h-5" fill={favorites.includes(item.id) ? 'currentColor' : 'none'} />
+                  </button>
+                </div>
+                <div className="absolute top-3 left-3 flex gap-1">
+                  {item.is_featured && (
+                    <Badge className="bg-yellow-500 text-white border-0 shadow-sm">
+                      <Sparkles className="w-3 h-3 mr-1" />
+                      Bestseller
+                    </Badge>
+                  )}
+                  {item.dietary_info?.includes('vegetarian') && (
+                    <Badge className="bg-green-500 text-white border-0 shadow-sm">
+                      <Leaf className="w-3 h-3 mr-1" />
+                      Veg
+                    </Badge>
+                  )}
+                  {item.dietary_info?.includes('spicy') && (
+                    <Badge className="bg-red-500 text-white border-0 shadow-sm">
+                      <Flame className="w-3 h-3 mr-1" />
+                      Spicy
+                    </Badge>
+                  )}
+                  {item.created_at && (() => {
+                    const created = new Date(item.created_at);
+                    const now = new Date();
+                    const diff = (now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24);
+                    return diff <= 7;
+                  })() && (
+                    <Badge className="bg-pink-500 text-white border-0 shadow-sm">
+                      <Sparkles className="w-3 h-3 mr-1" />
+                      New
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start mb-3">
+                  <h3 className="font-bold text-lg text-gray-900 dark:text-white group-hover:text-orange-600 transition-colors">{item.name}</h3>
+                  <span className="font-bold text-xl text-orange-600">${item.price.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <StarIcon
+                        key={star}
+                        className={`w-4 h-4 ${star <= 4 ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">(4.2 • 12 reviews)</span>
+                </div>
+                <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2">{item.description}</p>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => addToCart(item)}
+                    className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    {t('addToCart')}
+                  </Button>
+                  <Button
+                    onClick={() => openItemDetails(item)}
+                    variant="outline"
+                    className="px-3 py-3 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
+                    </svg>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {itemsToShow.length === 0 && (
+          <div className="text-center py-16">
+            <div className="text-8xl mb-6">🍽️</div>
+            <h3 className="text-2xl font-bold text-gray-700 dark:text-gray-300 mb-2">No items found</h3>
+            <p className="text-gray-500 dark:text-gray-400">No menu items available in this category.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Cart Summary - Fixed Bottom on Mobile */}
+      {cart.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 shadow-2xl md:hidden">
+          <div className="flex justify-between items-center px-6 py-4">
+            <div>
+              <p className="font-semibold text-gray-900 dark:text-white">{getCartItemCount()} items</p>
+              <p className="text-orange-600 font-bold text-lg">${getFinalTotal().toFixed(2)}</p>
+            </div>
+            <Button
+              onClick={() => setShowCartPopup(!showCartPopup)}
+              className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold px-8 py-3 rounded-full shadow-lg"
+            >
+              <ShoppingCart className="w-4 h-4 mr-2" />
+              {t('cart')}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Cart Popup */}
+      {cart.length > 0 && showCartPopup && (
+        <div className="md:hidden fixed inset-0 z-50 bg-black bg-opacity-50 flex items-end">
+          <div className="cart-popup w-full bg-white dark:bg-gray-800 rounded-t-3xl shadow-2xl max-h-96 overflow-y-auto animate-fade-in">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-xl flex items-center text-gray-900 dark:text-white">
+                  <ShoppingCart className="w-6 h-6 mr-2 text-orange-500" />
+                  {t('cart')} ({getCartItemCount()})
+                </h3>
+                <button
+                  onClick={() => setShowCartPopup(false)}
+                  className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
+                {cart.map((item) => (
+                  <div key={item.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900 dark:text-white">{item.name}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Qty: {item.quantity}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-gray-900 dark:text-white">${(item.price * item.quantity).toFixed(2)}</span>
+                      <button
+                        onClick={() => removeFromCart(item.id)}
+                        className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Coupon Section */}
+              {appliedCoupon ? (
+                <div className="flex items-center justify-between mb-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <span className="text-green-600 font-semibold text-sm">Coupon {appliedCoupon} applied!</span>
+                  <Button size="sm" variant="ghost" className="text-red-500 h-6 px-2" onClick={handleRemoveCoupon}>Remove</Button>
+                </div>
+              ) : (
+                <div className="flex gap-2 mb-3">
+                  <Input
+                    value={coupon}
+                    onChange={e => setCoupon(e.target.value)}
+                    placeholder="Promo code"
+                    className="flex-1 text-sm"
+                  />
+                  <Button size="sm" onClick={handleApplyCoupon} className="bg-orange-500 hover:bg-orange-600">Apply</Button>
+                </div>
+              )}
+              {couponError && <p className="text-xs text-red-500 mb-3">{couponError}</p>}
+              
+              {/* Discount */}
+              {discount > 0 && (
+                <div className="flex justify-between items-center text-green-600 font-semibold mb-3">
+                  <span>Discount:</span>
+                  <span>- ${discount.toFixed(2)}</span>
+                </div>
+              )}
+              
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="font-bold text-gray-900 dark:text-white">{t('total')}:</span>
+                  <span className="font-bold text-xl text-orange-600">${getFinalTotal().toFixed(2)}</span>
+                </div>
+                <Button
+                  onClick={() => {
+                    setShowCartPopup(false);
+                    setShowCheckout(true);
+                  }}
+                  className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-3 rounded-lg shadow-lg"
+                >
+                  {t('checkout')}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Desktop Cart Popup */}
+      {cart.length > 0 && showCartPopup && (
+        <div className="cart-popup hidden md:block fixed top-20 right-4 z-50 w-80 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 max-h-96 overflow-y-auto animate-fade-in">
+          <div className="p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-xl flex items-center text-gray-900 dark:text-white">
+                <ShoppingCart className="w-6 h-6 mr-2 text-orange-500" />
+                {t('cart')} ({getCartItemCount()})
+              </h3>
+              <button
+                onClick={() => setShowCartPopup(false)}
+                className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
+              {cart.map((item) => (
+                <div key={item.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900 dark:text-white">{item.name}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Qty: {item.quantity}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-gray-900 dark:text-white">${(item.price * item.quantity).toFixed(2)}</span>
+                    <button
+                      onClick={() => removeFromCart(item.id)}
+                      className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {/* Coupon Section */}
+            {appliedCoupon ? (
+              <div className="flex items-center justify-between mb-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                <span className="text-green-600 font-semibold text-sm">Coupon {appliedCoupon} applied!</span>
+                <Button size="sm" variant="ghost" className="text-red-500 h-6 px-2" onClick={handleRemoveCoupon}>Remove</Button>
+              </div>
+            ) : (
+              <div className="flex gap-2 mb-3">
+                <Input
+                  value={coupon}
+                  onChange={e => setCoupon(e.target.value)}
+                  placeholder="Promo code"
+                  className="flex-1 text-sm"
+                />
+                <Button size="sm" onClick={handleApplyCoupon} className="bg-orange-500 hover:bg-orange-600">Apply</Button>
+              </div>
+            )}
+            {couponError && <p className="text-xs text-red-500 mb-3">{couponError}</p>}
+            
+            {/* Discount */}
+            {discount > 0 && (
+              <div className="flex justify-between items-center text-green-600 font-semibold mb-3">
+                <span>Discount:</span>
+                <span>- ${discount.toFixed(2)}</span>
+              </div>
+            )}
+            
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+              <div className="flex justify-between items-center mb-4">
+                <span className="font-bold text-gray-900 dark:text-white">{t('total')}:</span>
+                <span className="font-bold text-xl text-orange-600">${getFinalTotal().toFixed(2)}</span>
+              </div>
+              <Button
+                onClick={() => {
+                  setShowCartPopup(false);
+                  setShowCheckout(true);
+                }}
+                className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-3 rounded-lg shadow-lg"
+              >
+                {t('checkout')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Checkout Modal */}
       <Dialog open={showCheckout} onOpenChange={setShowCheckout}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Complete Your Order</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Table Number Display */}
+            {tableNumber && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-blue-600 dark:text-blue-400">📍</span>
+                  <span className="font-medium text-blue-800 dark:text-blue-200">
+                    Table {tableNumber}
+                  </span>
+                </div>
+                <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+                  Your order will be delivered to your table
+                </p>
+              </div>
+            )}
+
+            {/* Order Summary */}
             <div className="space-y-2">
-              <Label htmlFor="name">Name *</Label>
-              <Input
-                id="name"
-                value={customerInfo.name}
-                onChange={(e) => setCustomerInfo({...customerInfo, name: e.target.value})}
-                placeholder="Your name"
-              />
+              <h3 className="font-semibold text-lg">Order Summary</h3>
+              <div className="max-h-40 overflow-y-auto space-y-2">
+                {cart.map((item, index) => (
+                  <div key={index} className="flex justify-between items-center text-sm">
+                    <span className="flex-1">
+                      {item.quantity}x {item.name}
+                    </span>
+                    <span className="font-medium">${(item.price * item.quantity).toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone *</Label>
-              <Input
-                id="phone"
-                value={customerInfo.phone}
-                onChange={(e) => setCustomerInfo({...customerInfo, phone: e.target.value})}
-                placeholder="Your phone number"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email (Optional)</Label>
-              <Input
-                id="email"
-                type="email"
-                value={customerInfo.email}
-                onChange={(e) => setCustomerInfo({...customerInfo, email: e.target.value})}
-                placeholder="your@email.com"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="table">Table Number (Optional)</Label>
-              <Input
-                id="table"
-                value={customerInfo.tableNumber}
-                onChange={(e) => setCustomerInfo({...customerInfo, tableNumber: e.target.value})}
-                placeholder="Table number"
-              />
-            </div>
-            <div className="space-y-2">
+
+            {/* Optional Notes */}
+            <div>
               <Label htmlFor="notes">Special Instructions (Optional)</Label>
               <Textarea
                 id="notes"
                 value={customerInfo.notes}
-                onChange={(e) => setCustomerInfo({...customerInfo, notes: e.target.value})}
-                placeholder="Any special requests..."
+                onChange={(e) => setCustomerInfo(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Any special requests or dietary requirements..."
                 rows={3}
               />
             </div>
-            <div className="border-t pt-4">
-              <div className="flex justify-between items-center font-bold text-lg">
-                <span>Subtotal:</span>
-                <span>${getCartTotal().toFixed(2)}</span>
+
+            {/* Total and Place Order */}
+            <div className="border-t pt-4 space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-lg">Total:</span>
+                <span className="font-bold text-xl text-orange-600">${getFinalTotal().toFixed(2)}</span>
               </div>
+              
               {appliedCoupon && (
-                <div className="flex items-center justify-between mt-2 animate-fade-in">
-                  <span className="text-green-600 font-semibold">Coupon {appliedCoupon} applied!</span>
-                  <Button size="sm" variant="ghost" className="text-red-500" onClick={handleRemoveCoupon}>Remove</Button>
+                <div className="flex justify-between items-center text-sm text-green-600">
+                  <span>Discount Applied:</span>
+                  <span>-${discount.toFixed(2)}</span>
                 </div>
               )}
-              {discount > 0 && (
-                <div className="flex justify-between items-center text-green-600 font-semibold mt-2 animate-fade-in">
-                  <span>Discount:</span>
-                  <span>- ${discount.toFixed(2)}</span>
-                </div>
-              )}
-              <div className="flex justify-between items-center font-bold text-lg mt-2">
-                <span>Total:</span>
-                <span>${getFinalTotal().toFixed(2)}</span>
-              </div>
-              <Button 
-                className="w-full mt-4 bg-gradient-to-r from-orange-400 to-pink-400 text-white font-bold shadow-lg hover:from-orange-500 hover:to-pink-500"
-                onClick={async () => {
-                  setPlacingOrder(true);
-                  await handlePlaceOrder();
-                  setPlacingOrder(false);
-                }}
-                disabled={!customerInfo.name || !customerInfo.phone || cart.length === 0 || placingOrder}
+              
+              <Button
+                onClick={handlePlaceOrder}
+                disabled={placingOrder}
+                className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-3 rounded-lg shadow-lg"
               >
-                {placingOrder ? 'Placing Order...' : 'Place Order'}
+                {placingOrder ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Placing Order...
+                  </>
+                ) : (
+                  `Place Order - $${getFinalTotal().toFixed(2)}`
+                )}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
+      {/* Item Details Dialog */}
+      <Dialog open={showItemDetails} onOpenChange={setShowItemDetails}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">{selectedItem?.name}</DialogTitle>
+          </DialogHeader>
+          {selectedItem && (
+            <div className="space-y-6">
+              {/* Item Image */}
+              <div className="relative h-64 rounded-lg overflow-hidden">
+                {selectedItem.image_url ? (
+                  <img
+                    src={selectedItem.image_url}
+                    alt={selectedItem.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-orange-100 to-red-100 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center">
+                    <span className="text-8xl">🍽️</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Item Description */}
+              <div>
+                <h3 className="font-semibold text-lg mb-2">Description</h3>
+                <p className="text-gray-600 dark:text-gray-400">{selectedItem.description}</p>
+              </div>
+
+              {/* Customization Section */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg">Customize Your Order</h3>
+                
+                {/* Add-ons */}
+                <div>
+                  <h4 className="font-medium mb-3">Add-ons</h4>
+                  <div className="grid grid-cols-1 gap-3">
+                    {ADDONS.map((addon) => (
+                      <label key={addon.id} className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4 text-orange-500 border-gray-300 rounded focus:ring-orange-500"
+                          />
+                          <span className="font-medium">{addon.name}</span>
+                        </div>
+                        <span className="text-orange-600 font-semibold">+${addon.price.toFixed(2)}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Variants */}
+                <div>
+                  <h4 className="font-medium mb-3">Size & Style</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    {VARIANTS.map((variant) => (
+                      <label key={variant.id} className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="radio"
+                            name="variant"
+                            className="w-4 h-4 text-orange-500 border-gray-300 focus:ring-orange-500"
+                            defaultChecked={variant.id === 'regular'}
+                          />
+                          <span className="font-medium">{variant.name}</span>
+                        </div>
+                        {variant.price > 0 && (
+                          <span className="text-orange-600 font-semibold">+${variant.price.toFixed(2)}</span>
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Special Instructions */}
+                <div>
+                  <h4 className="font-medium mb-3">Special Instructions</h4>
+                  <Textarea
+                    placeholder="Any special requests or dietary requirements..."
+                    className="w-full"
+                    rows={3}
+                  />
+                </div>
+              </div>
+
+              {/* Price Summary */}
+              <div className="border-t pt-4">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-lg font-semibold">Total Price:</span>
+                  <span className="text-2xl font-bold text-orange-600">${selectedItem.price.toFixed(2)}</span>
+                </div>
+                <Button
+                  onClick={() => {
+                    addToCart(selectedItem);
+                    setShowItemDetails(false);
+                  }}
+                  className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-3 rounded-lg shadow-lg"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add to Cart
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Authentication Modal */}
+      <Dialog open={showAuth} onOpenChange={setShowAuth}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{authMode === 'login' ? 'Login' : 'Register'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {authMode === 'register' && (
+              <div>
+                <Label>Name</Label>
+                <Input
+                  value={authName}
+                  onChange={e => setAuthName(e.target.value)}
+                  placeholder="Your name"
+                />
+              </div>
+            )}
+            <div>
+              <Label>Email</Label>
+              <Input
+                value={authEmail}
+                onChange={e => setAuthEmail(e.target.value)}
+                type="email"
+                placeholder="your@email.com"
+              />
+            </div>
+            <div>
+              <Label>Password</Label>
+              <Input
+                value={authPassword}
+                onChange={e => setAuthPassword(e.target.value)}
+                type="password"
+                placeholder="••••••••"
+              />
+            </div>
+            {authError && <p className="text-sm text-red-500">{authError}</p>}
+            <Button onClick={handleAuth} className="w-full">
+              {authMode === 'login' ? 'Login' : 'Register'}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
+              className="w-full"
+            >
+              {authMode === 'login' ? 'Need an account? Register' : 'Already have an account? Login'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Order History Modal */}
+      <Dialog open={showOrders} onOpenChange={setShowOrders}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>My Orders</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {orderHistory.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="text-6xl mb-4">📋</div>
+                <p className="text-gray-500 dark:text-gray-400">No orders yet.</p>
+              </div>
+            ) : (
+              orderHistory.map((order, i) => (
+                <div key={i} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-bold">Order #{order.id?.slice(-8) || i + 1}</span>
+                    <span className="text-sm text-gray-500">{new Date(order.placedAt).toLocaleDateString()}</span>
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    {order.items?.map((item: any, idx: number) => (
+                      <span key={idx} className="inline-block bg-white dark:bg-gray-700 px-2 py-1 rounded mr-2 mb-1">
+                        {item.name} x{item.quantity}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-lg">${order.total?.toFixed(2)}</span>
+                    <span className="text-sm text-green-600 font-semibold">{order.status || 'Completed'}</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Order Tracking Dialog */}
       {lastOrder && (
         <Dialog open={showTracking} onOpenChange={setShowTracking}>
-          <DialogContent className="max-w-md animate-fade-in">
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Order Tracking</DialogTitle>
             </DialogHeader>
@@ -1041,365 +1417,6 @@ export default function Order() {
           </DialogContent>
         </Dialog>
       )}
-      {/* Add dark mode toggle button (top right on desktop, floating on mobile) */}
-      <div className="fixed top-4 right-4 z-50 flex gap-2 items-center">
-        <Button
-          variant="ghost"
-          className="rounded-full p-2 shadow-lg bg-white/80 dark:bg-black/80 backdrop-blur"
-          onClick={() => setDarkMode(d => !d)}
-          aria-label={t('darkMode')}
-        >
-          {darkMode ? <Sun className="w-5 h-5 text-yellow-400" /> : <Moon className="w-5 h-5 text-gray-700" />}
-        </Button>
-        <select
-          value={lang}
-          onChange={e => setLang(e.target.value)}
-          className="rounded-full p-2 bg-white/80 dark:bg-black/80 shadow-lg border border-gray-200 dark:border-gray-700 text-sm"
-          aria-label={t('language')}
-        >
-          {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
-        </select>
-      </div>
-      {/* Add login/register modal */}
-      <Dialog open={showAuth} onOpenChange={setShowAuth}>
-        <DialogContent className="max-w-xs animate-fade-in">
-          <DialogHeader>
-            <DialogTitle>{authMode === 'login' ? 'Login' : 'Register'}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            {authMode === 'register' && (
-              <div>
-                <Label>Name</Label>
-                <Input value={authName} onChange={e => setAuthName(e.target.value)} />
-              </div>
-            )}
-            <div>
-              <Label>Email</Label>
-              <Input value={authEmail} onChange={e => setAuthEmail(e.target.value)} type="email" />
-            </div>
-            <div>
-              <Label>Password</Label>
-              <Input value={authPassword} onChange={e => setAuthPassword(e.target.value)} type="password" />
-            </div>
-            {authError && <p className="text-xs text-red-500">{authError}</p>}
-            <Button className="w-full" onClick={handleAuth}>{authMode === 'login' ? 'Login' : 'Register'}</Button>
-            <Button variant="ghost" className="w-full" onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}>
-              {authMode === 'login' ? 'Need an account? Register' : 'Already have an account? Login'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-      {/* Add order history modal */}
-      <Dialog open={showOrders} onOpenChange={setShowOrders}>
-        <DialogContent className="max-w-lg animate-fade-in">
-          <DialogHeader>
-            <DialogTitle>My Orders</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-            {orderHistory.length === 0 ? (
-              <p className="text-muted-foreground">No orders yet.</p>
-            ) : orderHistory.map((order, i) => (
-              <div key={i} className="bg-orange-50 dark:bg-gray-800 rounded p-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-bold">Order #</span>
-                  <span className="text-orange-600 font-mono">{order.id.slice(-8)}</span>
-                  <span className="ml-auto text-xs text-muted-foreground">{new Date(order.placedAt).toLocaleString()}</span>
-                </div>
-                <div className="flex flex-wrap gap-2 text-sm mb-1">
-                  {order.items.map((item: any, idx: number) => (
-                    <span key={idx} className="bg-white/80 dark:bg-gray-900 px-2 py-1 rounded shadow border border-orange-100 dark:border-gray-700">{item.name} x{item.quantity}</span>
-                  ))}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold">Total:</span>
-                  <span className="text-lg font-bold">${order.total.toFixed(2)}</span>
-                  <span className="ml-auto text-xs text-muted-foreground">{order.status || 'Completed'}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
-  );
-}
-
-interface MenuItemCardProps {
-  item: MenuItem;
-  onAddToCart: (item: MenuItem, specialInstructions?: string, selectedAddons?: string[], selectedVariant?: string) => void;
-}
-
-function MenuItemCard({ item, onAddToCart }: MenuItemCardProps) {
-  const [showDetails, setShowDetails] = useState(false);
-  const [specialInstructions, setSpecialInstructions] = useState('');
-  // Badge logic
-  const isNew = (() => {
-    if (!item.created_at) return false;
-    const created = new Date(item.created_at);
-    const now = new Date();
-    const diff = (now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24);
-    return diff <= 7;
-  })();
-
-  // Add-ons and variants (hardcoded for demo)
-  const ADDONS = [
-    { id: 'cheese', name: 'Extra Cheese', price: 1.5 },
-    { id: 'fries', name: 'Fries', price: 2 },
-    { id: 'drink', name: 'Soft Drink', price: 2.5 },
-  ];
-  const VARIANTS = [
-    { id: 'regular', name: 'Regular', price: 0 },
-    { id: 'large', name: 'Large', price: 3 },
-    { id: 'spicy', name: 'Spicy', price: 0 },
-    { id: 'mild', name: 'Mild', price: 0 },
-  ];
-
-  const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
-  const [selectedVariant, setSelectedVariant] = useState<string>('regular');
-
-  // Calculate price with add-ons/variant
-  const basePrice = item.price;
-  const addonTotal = selectedAddons.reduce((sum, id) => {
-    const addon = ADDONS.find(a => a.id === id);
-    return sum + (addon ? addon.price : 0);
-  }, 0);
-  const variantPrice = VARIANTS.find(v => v.id === selectedVariant)?.price || 0;
-  const finalPrice = basePrice + addonTotal + variantPrice;
-
-  // Ratings/Reviews
-  const [reviews, setReviews] = useState(DEMO_REVIEWS[item.id] || []);
-  const [reviewText, setReviewText] = useState('');
-  const [reviewRating, setReviewRating] = useState(5);
-  const [submittingReview, setSubmittingReview] = useState(false);
-
-  // Calculate average rating
-  const avgRating = reviews.length > 0 ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length) : 5;
-
-  const handleAddToCart = () => {
-    onAddToCart(
-      item,
-      specialInstructions || undefined,
-      selectedAddons,
-      selectedVariant
-    );
-    setSpecialInstructions('');
-    setSelectedAddons([]);
-    setSelectedVariant('regular');
-    setShowDetails(false);
-  };
-
-  return (
-    <Card className="group hover:shadow-lg transition-all duration-200 relative dark:bg-gray-900 dark:border-gray-700">
-      <CardContent className="p-0 dark:bg-gray-900">
-        {item.image_url && (
-          <div className="aspect-video overflow-hidden rounded-t-lg">
-            <img 
-              src={item.image_url} 
-              alt={item.name}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-            />
-          </div>
-        )}
-        <div className="p-6">
-          <div className="flex items-start justify-between mb-2">
-            <h3 className="font-bold text-lg flex items-center gap-2">
-              {item.name}
-              <span className="flex items-center gap-1 text-yellow-500 text-sm font-semibold">
-                <StarIcon className="w-4 h-4" />
-                {avgRating.toFixed(1)}
-                <span className="text-xs text-muted-foreground ml-1">({reviews.length})</span>
-              </span>
-            </h3>
-            <div className="flex gap-1 items-center">
-              {item.is_featured && (
-                <Badge variant="secondary" className="animate-fade-in flex items-center gap-1">
-                  <Star className="w-3 h-3 mr-1 text-yellow-500" />
-                  Bestseller
-                </Badge>
-              )}
-              {item.dietary_info?.includes('vegetarian') && (
-                <Badge variant="outline" className="animate-fade-in flex items-center gap-1">
-                  <Leaf className="w-3 h-3 mr-1 text-green-600" />
-                  Veg
-                </Badge>
-              )}
-              {item.dietary_info?.includes('vegan') && (
-                <Badge variant="outline" className="animate-fade-in flex items-center gap-1">
-                  <Leaf className="w-3 h-3 mr-1 text-lime-600" />
-                  Vegan
-                </Badge>
-              )}
-              {item.dietary_info?.includes('spicy') && (
-                <Badge variant="outline" className="animate-fade-in flex items-center gap-1">
-                  <Flame className="w-3 h-3 mr-1 text-red-500" />
-                  Spicy
-                </Badge>
-              )}
-              {isNew && (
-                <Badge variant="outline" className="animate-fade-in flex items-center gap-1 border-pink-400 text-pink-500">
-                  <Sparkles className="w-3 h-3 mr-1 text-pink-400" />
-                  New
-                </Badge>
-              )}
-              <button
-                onClick={() => toggleFavorite(item.id)}
-                className="ml-2 focus:outline-none"
-                aria-label={favorites.includes(item.id) ? 'Remove from favorites' : 'Add to favorites'}
-              >
-                <Heart
-                  className={`w-5 h-5 transition-all duration-200 ${favorites.includes(item.id) ? 'text-pink-500 scale-110' : 'text-gray-300 hover:text-pink-400'}`}
-                  fill={favorites.includes(item.id) ? 'currentColor' : 'none'}
-                />
-              </button>
-            </div>
-          </div>
-          
-          <p className="text-muted-foreground mb-4 line-clamp-2">{item.description}</p>
-          
-          <div className="flex items-center justify-between mb-4">
-            <span className="font-bold text-xl">${finalPrice.toFixed(2)}</span>
-            {item.preparation_time && (
-              <div className="flex items-center text-sm text-muted-foreground">
-                <Clock className="w-4 h-4 mr-1" />
-                {item.preparation_time} mins
-              </div>
-            )}
-          </div>
-
-          {item.allergens && item.allergens.length > 0 && (
-            <p className="text-xs text-muted-foreground mb-4">
-              Allergens: {item.allergens.join(', ')}
-            </p>
-          )}
-
-          <div className="flex gap-2">
-            <Button 
-              onClick={() => onAddToCart(item)} 
-              className="flex-1"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add to Order
-            </Button>
-            <Dialog open={showDetails} onOpenChange={setShowDetails}>
-              <DialogTrigger asChild>
-                <Button variant="outline">Customize</Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>{item.name}</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <p className="text-muted-foreground">{item.description}</p>
-                  {/* Add-ons */}
-                  <div>
-                    <Label>Add-ons</Label>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {ADDONS.map(addon => (
-                        <label key={addon.id} className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedAddons.includes(addon.id)}
-                            onChange={e => setSelectedAddons(val => e.target.checked ? [...val, addon.id] : val.filter(id => id !== addon.id))}
-                          />
-                          <span>{addon.name} (+${addon.price})</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  {/* Variants */}
-                  <div>
-                    <Label>Variant</Label>
-                    <div className="flex gap-4 mt-2">
-                      {VARIANTS.map(variant => (
-                        <label key={variant.id} className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="radio"
-                            name={`variant-${item.id}`}
-                            checked={selectedVariant === variant.id}
-                            onChange={() => setSelectedVariant(variant.id)}
-                          />
-                          <span>{variant.name}{variant.price > 0 ? ` (+$${variant.price})` : ''}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  {/* Special Instructions */}
-                  <div className="space-y-2">
-                    <Label htmlFor="instructions">Special Instructions</Label>
-                    <Textarea
-                      id="instructions"
-                      value={specialInstructions}
-                      onChange={(e) => setSpecialInstructions(e.target.value)}
-                      placeholder="Any special requests..."
-                      rows={3}
-                    />
-                  </div>
-                  {/* Ratings/Reviews Section */}
-                  <div className="border-t pt-4 mt-4">
-                    <h4 className="font-bold mb-2 flex items-center gap-2">
-                      <StarIcon className="w-5 h-5 text-yellow-500" />
-                      Ratings & Reviews
-                    </h4>
-                    <div className="flex items-center gap-2 mb-2">
-                      {[1,2,3,4,5].map(star => (
-                        <button
-                          key={star}
-                          onClick={() => setReviewRating(star)}
-                          className={`focus:outline-none ${reviewRating >= star ? 'text-yellow-500' : 'text-gray-300'}`}
-                        >
-                          <StarIcon className="w-5 h-5" fill={reviewRating >= star ? 'currentColor' : 'none'} />
-                        </button>
-                      ))}
-                      <span className="ml-2 text-sm">{reviewRating} / 5</span>
-                    </div>
-                    <Textarea
-                      value={reviewText}
-                      onChange={e => setReviewText(e.target.value)}
-                      placeholder="Write your review..."
-                      rows={2}
-                      className="mb-2"
-                    />
-                    <Button
-                      size="sm"
-                      disabled={submittingReview || !reviewText.trim()}
-                      onClick={async () => {
-                        setSubmittingReview(true);
-                        setTimeout(() => {
-                          setReviews(r => [{
-                            rating: reviewRating,
-                            text: reviewText,
-                            user: 'Guest',
-                            date: new Date().toLocaleDateString(),
-                          }, ...r]);
-                          setReviewText('');
-                          setReviewRating(5);
-                          setSubmittingReview(false);
-                        }, 600);
-                      }}
-                    >
-                      {submittingReview ? 'Submitting...' : 'Submit Review'}
-                    </Button>
-                    <div className="mt-4 space-y-2 max-h-40 overflow-y-auto animate-fade-in">
-                      {reviews.length === 0 && (
-                        <p className="text-muted-foreground">No reviews yet. Be the first to review!</p>
-                      )}
-                      {reviews.map((r, i) => (
-                        <div key={i} className="bg-orange-50 rounded p-2 flex flex-col gap-1">
-                          <span className="flex items-center gap-1 text-yellow-500">
-                            {[...Array(r.rating)].map((_, idx) => <StarIcon key={idx} className="w-3 h-3" fill="currentColor" />)}
-                            <span className="text-xs text-muted-foreground ml-2">{r.user} • {r.date}</span>
-                          </span>
-                          <span className="text-sm">{r.text}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
   );
 }

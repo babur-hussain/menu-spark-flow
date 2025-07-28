@@ -51,6 +51,20 @@ const menuItemSchema = z.object({
   is_vegan: z.boolean().default(false),
   is_gluten_free: z.boolean().default(false),
   is_available: z.boolean().default(true),
+  is_featured: z.boolean().default(false),
+  is_spicy: z.boolean().default(false),
+  dietary_info: z.array(z.string()).default([]),
+  addons: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    price: z.number()
+  })).default([]),
+  variants: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    price: z.number()
+  })).default([]),
+  badges: z.array(z.string()).default([]),
 });
 
 type MenuItemFormData = z.infer<typeof menuItemSchema>;
@@ -68,6 +82,12 @@ interface MenuItem {
   is_vegan: boolean;
   is_gluten_free: boolean;
   is_available: boolean;
+  is_featured: boolean;
+  is_spicy: boolean;
+  dietary_info: string[];
+  addons: Array<{id: string; name: string; price: number}>;
+  variants: Array<{id: string; name: string; price: number}>;
+  badges: string[];
   image_url?: string;
   created_at: string;
   updated_at: string;
@@ -186,46 +206,93 @@ export default function MenuManagement() {
   });
 
   const onSubmit = async (data: MenuItemFormData) => {
-    if (!user || !currentRestaurant) {
+    if (!currentRestaurant) {
       toast({
         title: "Error",
-        description: "User or restaurant not found. Please log in again.",
+        description: "Please select a restaurant first.",
         variant: "destructive",
       });
       return;
     }
 
+    setIsSubmitting(true);
+
     try {
-      setIsSubmitting(true);
-      console.log('Creating menu item for restaurant:', currentRestaurant.id);
-      
+      // Collect selected add-ons
+      const selectedAddons = [
+        { id: 'cheese', name: 'Extra Cheese', price: 1.5 },
+        { id: 'fries', name: 'French Fries', price: 2.0 },
+        { id: 'drink', name: 'Soft Drink', price: 2.5 },
+        { id: 'sauce', name: 'Extra Sauce', price: 0.5 },
+        { id: 'bacon', name: 'Bacon', price: 3.0 },
+        { id: 'guacamole', name: 'Guacamole', price: 1.0 },
+      ].filter(addon => {
+        const checkbox = document.getElementById(`addon-${addon.id}`) as HTMLInputElement;
+        return checkbox?.checked;
+      });
+
+      // Collect selected variants
+      const selectedVariants = [
+        { id: 'regular', name: 'Regular', price: 0 },
+        { id: 'large', name: 'Large', price: 3.0 },
+        { id: 'spicy', name: 'Spicy', price: 0 },
+        { id: 'mild', name: 'Mild', price: 0 },
+        { id: 'extra_spicy', name: 'Extra Spicy', price: 0 },
+        { id: 'family_size', name: 'Family Size', price: 5.0 },
+      ].filter(variant => {
+        const checkbox = document.getElementById(`variant-${variant.id}`) as HTMLInputElement;
+        return checkbox?.checked;
+      });
+
+      // Collect selected badges
+      const selectedBadges = [
+        'Bestseller', 'New', 'Chef Special', 'Popular', 'Limited Time', 'Seasonal', 'Organic', 'Local'
+      ].filter(badge => {
+        const checkbox = document.getElementById(`badge-${badge.toLowerCase().replace(' ', '-')}`) as HTMLInputElement;
+        return checkbox?.checked;
+      });
+
+      // Collect dietary information
+      const dietaryInfo = [
+        'vegetarian', 'vegan', 'gluten-free', 'dairy-free', 'nut-free', 'halal', 'kosher', 'low-carb', 'keto-friendly'
+      ].filter(diet => {
+        const checkbox = document.getElementById(`diet-${diet}`) as HTMLInputElement;
+        return checkbox?.checked;
+      });
+
       const menuItemData: CreateMenuItemData = {
+        restaurant_id: currentRestaurant.id,
         name: data.name,
         description: data.description,
         price: parseFloat(data.price),
         category: data.category,
         preparation_time: parseInt(data.preparation_time),
         calories: data.calories ? parseInt(data.calories) : undefined,
-        allergens: data.allergens ? data.allergens.split(',').map(a => a.trim()) : [],
+        allergens: data.allergens ? data.allergens.split(',').map(a => a.trim()) : undefined,
         is_vegetarian: data.is_vegetarian,
         is_vegan: data.is_vegan,
         is_gluten_free: data.is_gluten_free,
         is_available: data.is_available,
+        is_featured: data.is_featured,
+        is_spicy: data.is_spicy,
+        dietary_info: dietaryInfo,
+        addons: selectedAddons,
+        variants: selectedVariants,
+        badges: selectedBadges,
       };
 
-      const newItem = await menuService.createMenuItem(currentRestaurant.id, menuItemData);
-      console.log('Created menu item:', newItem);
-      
-      setMenuItems(prev => [newItem, ...prev]);
-      setIsAddDialogOpen(false);
-      form.reset();
-      
+      await menuService.createMenuItem(menuItemData);
+
       toast({
         title: "Success",
         description: "Menu item created successfully!",
       });
+
+      setIsAddDialogOpen(false);
+      form.reset();
+      fetchMenuItems();
     } catch (error) {
-      console.error('Error creating menu item:', error);
+      console.error("Error creating menu item:", error);
       toast({
         title: "Error",
         description: "Failed to create menu item. Please try again.",
@@ -479,7 +546,38 @@ export default function MenuManagement() {
                       {item.is_vegetarian && <Badge variant="secondary" className="text-xs">Vegetarian</Badge>}
                       {item.is_vegan && <Badge variant="secondary" className="text-xs">Vegan</Badge>}
                       {item.is_gluten_free && <Badge variant="secondary" className="text-xs">Gluten-Free</Badge>}
+                      {item.is_featured && <Badge variant="secondary" className="text-xs bg-yellow-100 text-yellow-800">Featured</Badge>}
+                      {item.is_spicy && <Badge variant="secondary" className="text-xs bg-red-100 text-red-800">Spicy</Badge>}
+                      {item.badges?.map((badge, index) => (
+                        <Badge key={index} variant="outline" className="text-xs">
+                          {badge}
+                        </Badge>
+                      ))}
                     </div>
+                    {item.dietary_info && item.dietary_info.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {item.dietary_info.map((diet, index) => (
+                          <Badge key={index} variant="outline" className="text-xs">
+                            {diet}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    {(item.addons?.length > 0 || item.variants?.length > 0) && (
+                      <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-800 rounded text-xs">
+                        <div className="font-medium mb-1">Customization Options:</div>
+                        {item.addons?.length > 0 && (
+                          <div className="text-gray-600 dark:text-gray-400">
+                            <span className="font-medium">Add-ons:</span> {item.addons.map(a => a.name).join(', ')}
+                          </div>
+                        )}
+                        {item.variants?.length > 0 && (
+                          <div className="text-gray-600 dark:text-gray-400">
+                            <span className="font-medium">Variants:</span> {item.variants.map(v => v.name).join(', ')}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="flex gap-2 mt-4">
                     <Button
@@ -692,6 +790,158 @@ export default function MenuManagement() {
                         </FormItem>
                       )}
                     />
+                    <FormField
+                      control={form.control}
+                      name="is_featured"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-2">
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <FormLabel className="text-sm font-normal">Featured</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="is_spicy"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-2">
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <FormLabel className="text-sm font-normal">Spicy</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                {/* Customization Options */}
+                <div className="space-y-6 border-t pt-6">
+                  <h3 className="text-lg font-semibold">Customization Options</h3>
+                  
+                  {/* Add-ons Section */}
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Add-ons</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {[
+                        { id: 'cheese', name: 'Extra Cheese', price: 1.5 },
+                        { id: 'fries', name: 'French Fries', price: 2.0 },
+                        { id: 'drink', name: 'Soft Drink', price: 2.5 },
+                        { id: 'sauce', name: 'Extra Sauce', price: 0.5 },
+                        { id: 'bacon', name: 'Bacon', price: 3.0 },
+                        { id: 'guacamole', name: 'Guacamole', price: 1.0 },
+                      ].map((addon) => (
+                        <div key={addon.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id={`addon-${addon.id}`}
+                              className="w-4 h-4 text-orange-500 border-gray-300 rounded focus:ring-orange-500"
+                            />
+                            <Label htmlFor={`addon-${addon.id}`} className="text-sm font-medium">
+                              {addon.name}
+                            </Label>
+                          </div>
+                          <span className="text-sm text-orange-600 font-semibold">+${addon.price.toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Variants Section */}
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Size & Style Variants</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {[
+                        { id: 'regular', name: 'Regular', price: 0 },
+                        { id: 'large', name: 'Large', price: 3.0 },
+                        { id: 'spicy', name: 'Spicy', price: 0 },
+                        { id: 'mild', name: 'Mild', price: 0 },
+                        { id: 'extra_spicy', name: 'Extra Spicy', price: 0 },
+                        { id: 'family_size', name: 'Family Size', price: 5.0 },
+                      ].map((variant) => (
+                        <div key={variant.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id={`variant-${variant.id}`}
+                              className="w-4 h-4 text-orange-500 border-gray-300 rounded focus:ring-orange-500"
+                            />
+                            <Label htmlFor={`variant-${variant.id}`} className="text-sm font-medium">
+                              {variant.name}
+                            </Label>
+                          </div>
+                          {variant.price > 0 && (
+                            <span className="text-sm text-orange-600 font-semibold">+${variant.price.toFixed(2)}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Badges Section */}
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Item Badges</Label>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {[
+                        'Bestseller',
+                        'New',
+                        'Chef Special',
+                        'Popular',
+                        'Limited Time',
+                        'Seasonal',
+                        'Organic',
+                        'Local'
+                      ].map((badge) => (
+                        <div key={badge} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`badge-${badge.toLowerCase().replace(' ', '-')}`}
+                            className="w-4 h-4 text-orange-500 border-gray-300 rounded focus:ring-orange-500"
+                          />
+                          <Label htmlFor={`badge-${badge.toLowerCase().replace(' ', '-')}`} className="text-sm">
+                            {badge}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Dietary Information */}
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Dietary Information</Label>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {[
+                        'vegetarian',
+                        'vegan',
+                        'gluten-free',
+                        'dairy-free',
+                        'nut-free',
+                        'halal',
+                        'kosher',
+                        'low-carb',
+                        'keto-friendly'
+                      ].map((diet) => (
+                        <div key={diet} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`diet-${diet}`}
+                            className="w-4 h-4 text-orange-500 border-gray-300 rounded focus:ring-orange-500"
+                          />
+                          <Label htmlFor={`diet-${diet}`} className="text-sm capitalize">
+                            {diet.replace('-', ' ')}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
                 
@@ -725,4 +975,4 @@ export default function MenuManagement() {
       </div>
     </AdminLayout>
   );
-} 
+}

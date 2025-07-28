@@ -10,32 +10,32 @@ All colors MUST be HSL for consistency and theming.
   :root {
     /* Base colors - Clean whites and warm neutrals */
     --background: 0 0% 100%;
-    --foreground: 24 100% 5%;
+    --foreground: 222.2 84% 4.9%;
 
     /* Card system - Subtle warmth */
     --card: 0 0% 100%;
-    --card-foreground: 24 100% 5%;
+    --card-foreground: 222.2 84% 4.9%;
 
     /* Popover system */
     --popover: 0 0% 100%;
-    --popover-foreground: 24 100% 5%;
+    --popover-foreground: 222.2 84% 4.9%;
 
     /* Primary - Electric Orange (appetite-stimulating) */
-    --primary: 15 100% 55%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
     --primary-hover: 15 100% 50%;
 
     /* Secondary - Golden Sunrise */
-    --secondary: 38 100% 65%;
-    --secondary-foreground: 25 100% 10%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
 
     /* Muted - Soft Cream */
-    --muted: 35 50% 97%;
-    --muted-foreground: 35 15% 45%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
 
     /* Accent - Vibrant Coral */
-    --accent: 348 100% 62%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
 
     /* New Punchy Colors */
     --electric-blue: 220 100% 55%;
@@ -53,13 +53,13 @@ All colors MUST be HSL for consistency and theming.
     --warning-foreground: 24 100% 15%;
 
     /* Destructive - Deep Red */
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
 
     /* Form elements */
-    --border: 30 30% 88%;
-    --input: 30 30% 88%;
-    --ring: 18 100% 62%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
 
     /* Stunning Food-themed gradients */
     --gradient-primary: linear-gradient(135deg, hsl(15 100% 55%), hsl(348 100% 62%), hsl(25 100% 58%));
@@ -99,31 +99,36 @@ All colors MUST be HSL for consistency and theming.
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
   }
 
   .dark {
     /* Dark mode - Rich, warm darks with orange accents */
-    --background: 24 100% 3%;
-    --foreground: 30 40% 95%;
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
 
-    --card: 24 50% 5%;
-    --card-foreground: 30 40% 95%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
 
-    --popover: 24 50% 5%;
-    --popover-foreground: 30 40% 95%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
 
-    --primary: 15 100% 55%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
     --primary-hover: 15 100% 50%;
 
-    --secondary: 25 40% 15%;
-    --secondary-foreground: 35 60% 85%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
 
-    --muted: 25 40% 15%;
-    --muted-foreground: 35 30% 65%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
 
-    --accent: 348 100% 62%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
 
     --success: 142 76% 36%;
     --success-foreground: 0 0% 100%;
@@ -131,12 +136,12 @@ All colors MUST be HSL for consistency and theming.
     --warning: 45 93% 58%;
     --warning-foreground: 24 100% 5%;
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
 
-    --border: 24 30% 18%;
-    --input: 24 30% 18%;
-    --ring: 18 100% 62%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
 
     /* Vibrant Dark mode gradients */
     --gradient-primary: linear-gradient(135deg, hsl(15 100% 55%), hsl(348 100% 62%), hsl(25 100% 58%));
@@ -154,6 +159,11 @@ All colors MUST be HSL for consistency and theming.
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
   }
 }
 
@@ -166,6 +176,67 @@ All colors MUST be HSL for consistency and theming.
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+}
+
+/* Custom scrollbar hiding */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Smooth transitions */
+* {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Line clamp utility */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Animation utilities */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #f97316, #ef4444);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glass morphism effect */
+.glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dark .glass {
+  background: rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 @layer components {

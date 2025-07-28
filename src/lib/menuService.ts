@@ -13,6 +13,12 @@ export interface MenuItem {
   is_vegan: boolean;
   is_gluten_free: boolean;
   is_available: boolean;
+  is_featured: boolean;
+  is_spicy: boolean;
+  dietary_info: string[];
+  addons: Array<{id: string; name: string; price: number}>;
+  variants: Array<{id: string; name: string; price: number}>;
+  badges: string[];
   image_url?: string;
   restaurant_id: string;
   created_at: string;
@@ -31,6 +37,12 @@ export interface CreateMenuItemData {
   is_vegan: boolean;
   is_gluten_free: boolean;
   is_available: boolean;
+  is_featured: boolean;
+  is_spicy: boolean;
+  dietary_info: string[];
+  addons: Array<{id: string; name: string; price: number}>;
+  variants: Array<{id: string; name: string; price: number}>;
+  badges: string[];
   image_url?: string;
 }
 
@@ -61,6 +73,12 @@ export const menuService = {
         is_vegetarian: item.dietary_info?.includes('vegetarian') || false,
         is_vegan: item.dietary_info?.includes('vegan') || false,
         is_gluten_free: item.dietary_info?.includes('gluten_free') || false,
+        is_featured: item.dietary_info?.includes('featured') || false,
+        is_spicy: item.dietary_info?.includes('spicy') || false,
+        dietary_info: item.dietary_info || [],
+        addons: item.addons || [],
+        variants: item.variants || [],
+        badges: item.badges || [],
         calories: undefined, // Not in DB schema
       }));
     } catch (error) {
@@ -130,28 +148,38 @@ export const menuService = {
   async createMenuItem(restaurantId: string, menuItem: CreateMenuItemData): Promise<MenuItem> {
     try {
       // Get or create the category
-      let categoryId = await this.getOrCreateCategory(restaurantId, menuItem.category);
-      
-      // Convert dietary info
+      const categoryId = await this.getOrCreateCategory(restaurantId, menuItem.category);
+
+      // Prepare dietary info array
       const dietaryInfo = [];
       if (menuItem.is_vegetarian) dietaryInfo.push('vegetarian');
       if (menuItem.is_vegan) dietaryInfo.push('vegan');
       if (menuItem.is_gluten_free) dietaryInfo.push('gluten_free');
+      if (menuItem.is_spicy) dietaryInfo.push('spicy');
+      if (menuItem.is_featured) dietaryInfo.push('featured');
+      // Add custom dietary info
+      if (menuItem.dietary_info) {
+        dietaryInfo.push(...menuItem.dietary_info);
+      }
 
       const { data, error } = await supabase
         .from('menu_items')
-        .insert([{
+        .insert({
           restaurant_id: restaurantId,
           category_id: categoryId,
           name: menuItem.name,
           description: menuItem.description,
           price: menuItem.price,
           preparation_time: menuItem.preparation_time,
-          image_url: menuItem.image_url,
-          is_available: menuItem.is_available,
+          calories: menuItem.calories,
+          allergens: menuItem.allergens,
           dietary_info: dietaryInfo,
-          allergens: menuItem.allergens || [],
-        }])
+          addons: menuItem.addons || [],
+          variants: menuItem.variants || [],
+          badges: menuItem.badges || [],
+          is_available: menuItem.is_available,
+          image_url: menuItem.image_url,
+        })
         .select(`
           *,
           menu_categories!inner(name)
@@ -163,13 +191,20 @@ export const menuService = {
         throw error;
       }
 
+      // Transform the response to match our interface
       return {
         ...data,
         category: data.menu_categories?.name || 'Uncategorized',
         is_vegetarian: data.dietary_info?.includes('vegetarian') || false,
         is_vegan: data.dietary_info?.includes('vegan') || false,
         is_gluten_free: data.dietary_info?.includes('gluten_free') || false,
-        calories: undefined,
+        is_featured: data.dietary_info?.includes('featured') || false,
+        is_spicy: data.dietary_info?.includes('spicy') || false,
+        dietary_info: data.dietary_info || [],
+        addons: data.addons || [],
+        variants: data.variants || [],
+        badges: data.badges || [],
+        calories: undefined, // Not in DB schema
       };
     } catch (error) {
       console.error('Error in createMenuItem:', error);
