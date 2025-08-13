@@ -1,5 +1,13 @@
 import { supabase } from '../integrations/supabase/client';
 
+export interface OrderItemHistoryEntry {
+  name?: string;
+  menu_item_name?: string;
+  quantity: number;
+  price: number;
+  notes?: string;
+}
+
 export interface OrderHistoryEntry {
   id: string;
   restaurant_id: string;
@@ -9,7 +17,7 @@ export interface OrderHistoryEntry {
   customer_phone: string;
   order_type: 'dine_in' | 'takeaway' | 'delivery';
   status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed' | 'cancelled';
-  items: any[];
+  items: OrderItemHistoryEntry[];
   total_amount: number;
   tax_amount: number;
   tip_amount: number;
@@ -25,7 +33,20 @@ export interface OrderHistoryEntry {
 
 export const orderHistoryService = {
   // Save order to permanent history
-  async saveToPermanentHistory(order: any, restaurantId: string, restaurantName: string): Promise<void> {
+  async saveToPermanentHistory(
+    order: Partial<Omit<OrderHistoryEntry, 'id' | 'restaurant_id' | 'restaurant_name' | 'status' | 'order_type' | 'items' | 'total_amount' | 'tax_amount' | 'tip_amount' | 'created_at' | 'updated_at' | 'bill_generated'>> & {
+      status?: OrderHistoryEntry['status'];
+      order_type?: OrderHistoryEntry['order_type'];
+      items?: OrderItemHistoryEntry[];
+      total_amount?: number;
+      tax_amount?: number;
+      tip_amount?: number;
+      created_at?: string;
+      updated_at?: string;
+    },
+    restaurantId: string,
+    restaurantName: string
+  ): Promise<void> {
     try {
       const historyEntry: Omit<OrderHistoryEntry, 'id'> = {
         restaurant_id: restaurantId,
@@ -65,9 +86,9 @@ export const orderHistoryService = {
   },
 
   // Update order status in permanent history
-  async updateOrderStatus(orderId: string, status: string, billGenerated: boolean = false): Promise<void> {
+  async updateOrderStatus(orderId: string, status: OrderHistoryEntry['status'], billGenerated: boolean = false): Promise<void> {
     try {
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         status,
         updated_at: new Date().toISOString(),
       };

@@ -12,7 +12,7 @@ import * as z from "zod";
 import { QrCode, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { DEFAULT_ADMIN_CREDENTIALS, DEFAULT_RESTAURANT_CREDENTIALS, authService } from "@/lib/auth";
+import { authService } from "@/lib/auth";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -69,7 +69,7 @@ export default function AdminLogin() {
           setTimeout(() => {
             toast({
               title: "Need Help?",
-              description: "Try using the demo credentials below, or check your email for a confirmation link.",
+              description: "Please check your email for a confirmation link, or contact support if you need assistance.",
               variant: "default",
             });
           }, 2000);
@@ -144,12 +144,7 @@ export default function AdminLogin() {
     }
   };
 
-  const handleDemoLogin = (role: "restaurant_manager" | "super_admin") => {
-    const credentials = role === "super_admin" ? DEFAULT_ADMIN_CREDENTIALS : DEFAULT_RESTAURANT_CREDENTIALS;
-    form.setValue("email", credentials.email);
-    form.setValue("password", credentials.password);
-    form.setValue("role", role);
-  };
+
 
   return (
     <div className="min-h-screen bg-gradient-subtle flex items-center justify-center p-4">
@@ -255,30 +250,7 @@ export default function AdminLogin() {
               </form>
             </Form>
 
-            {/* Demo Credentials */}
-            <div className="mt-6 p-4 bg-muted rounded-lg">
-              <h3 className="text-sm font-medium mb-3">Demo Credentials</h3>
-              <div className="space-y-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  onClick={() => handleDemoLogin("restaurant_manager")}
-                >
-                  Restaurant Manager Demo
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  onClick={() => handleDemoLogin("super_admin")}
-                >
-                  Super Admin Demo
-                </Button>
-              </div>
-            </div>
+
 
             {/* Email Confirmation Help */}
             <div className="mt-4 p-4 bg-blue-50 rounded-lg">

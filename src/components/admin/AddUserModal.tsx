@@ -105,11 +105,12 @@ export function AddUserModal({ open, onOpenChange, onUserAdded }: AddUserModalPr
       
       onUserAdded();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating user:', error);
+      const message = error instanceof Error ? error.message : 'Failed to create user. Please try again.';
       toast({
         title: "Error",
-        description: error.message || "Failed to create user. Please try again.",
+        description: message,
         variant: "destructive",
       });
     } finally {

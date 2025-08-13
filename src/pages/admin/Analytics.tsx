@@ -18,13 +18,17 @@ import {
   Filter,
   Download,
   RefreshCw,
-  Loader2
+  Loader2,
+  AlertCircle
 } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { AnalyticsChart } from "@/components/analytics/AnalyticsChart";
 import { useAuth } from "@/contexts/AuthContext";
 import { restaurantAnalyticsService } from "@/lib/restaurantAnalytics";
+import { formatCurrency } from '@/lib/utils';
+import { simpleSetupDatabase } from "@/lib/simpleSetup";
+import { useToast } from "@/components/ui/use-toast";
 
 interface AnalyticsData {
   revenue: { month: string; value: number }[];
@@ -53,6 +57,7 @@ export default function Analytics() {
   const [topMenuItems, setTopMenuItems] = useState([]);
   const [customerSegments, setCustomerSegments] = useState([]);
   const [orderTypes, setOrderTypes] = useState([]);
+  const { toast } = useToast();
 
   // Fetch analytics data on component mount
   useEffect(() => {
@@ -121,7 +126,7 @@ export default function Analytics() {
           description: "Total revenue over time",
           icon: DollarSign,
           color: "#10b981",
-          formatValue: (value: number) => `$${value.toLocaleString()}`,
+          formatValue: (value: number) => formatCurrency(value),
         };
       case "orders":
         return {
@@ -153,7 +158,7 @@ export default function Analytics() {
           description: "Total revenue over time",
           icon: DollarSign,
           color: "#10b981",
-          formatValue: (value: number) => `$${value.toLocaleString()}`,
+          formatValue: (value: number) => formatCurrency(value),
         };
     }
   };
@@ -180,6 +185,53 @@ export default function Analytics() {
           </div>
         </div>
 
+        {/* Database Setup Alert */}
+        {!user?.restaurant_id && (
+          <div className="mb-6">
+            <Card className="border-red-200 bg-red-50 dark:bg-red-900/20">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <AlertCircle className="h-5 w-5 text-red-600" />
+                    <div>
+                      <h3 className="font-semibold text-red-800 dark:text-red-200">
+                        Database Setup Required
+                      </h3>
+                      <p className="text-sm text-red-600 dark:text-red-300">
+                        Your restaurant profile is not properly linked. Click the button to fix this.
+                      </p>
+                    </div>
+                  </div>
+                  <Button 
+                    onClick={async () => {
+                      try {
+                        setIsLoading(true);
+                        await simpleSetupDatabase();
+                        toast({
+                          title: "Database Setup",
+                          description: "Database setup completed! The page will reload shortly.",
+                        });
+                      } catch (error) {
+                        toast({
+                          title: "Setup Failed",
+                          description: "Database setup failed. Please try again.",
+                          variant: "destructive",
+                        });
+                      } finally {
+                        setIsLoading(false);
+                      }
+                    }}
+                    disabled={isLoading}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Setup Database"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {/* Quick Stats */}
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
@@ -196,7 +248,7 @@ export default function Analytics() {
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">${restaurantStats.totalRevenue.toFixed(2)}</div>
+                <div className="text-2xl font-bold">{formatCurrency(restaurantStats.totalRevenue)}</div>
                 <div className="flex items-center text-xs text-muted-foreground">
                   All time revenue
                 </div>
@@ -221,7 +273,7 @@ export default function Analytics() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  ${restaurantStats.totalOrders > 0 ? (restaurantStats.totalRevenue / restaurantStats.totalOrders).toFixed(2) : '0.00'}
+                  {restaurantStats.totalOrders > 0 ? formatCurrency(restaurantStats.totalRevenue / restaurantStats.totalOrders) : '0.00'}
                 </div>
                 <div className="flex items-center text-xs text-muted-foreground">
                   Average per order
@@ -318,7 +370,7 @@ export default function Analytics() {
                       </div>
                       <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
                         <span>{item.orders} orders</span>
-                        <span>${item.revenue}</span>
+                        <span>{formatCurrency(item.revenue)}</span>
                         <div className="flex items-center gap-1">
                           <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
                           <span>{item.rating}</span>
@@ -451,7 +503,7 @@ export default function Analytics() {
                       <CardTitle className="text-sm">Monthly Revenue</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">$89,600</div>
+                      <div className="text-2xl font-bold">{formatCurrency(89600)}</div>
                       <p className="text-xs text-muted-foreground">
                         +12.5% from last month
                       </p>
@@ -462,7 +514,7 @@ export default function Analytics() {
                       <CardTitle className="text-sm">Daily Average</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">$2,987</div>
+                      <div className="text-2xl font-bold">{formatCurrency(2987)}</div>
                       <p className="text-xs text-muted-foreground">
                         Per day this month
                       </p>
@@ -475,7 +527,7 @@ export default function Analytics() {
                     <CardContent>
                       <div className="text-2xl font-bold">Saturday</div>
                       <p className="text-xs text-muted-foreground">
-                        $4,200 average
+                        {formatCurrency(4200)} average
                       </p>
                     </CardContent>
                   </Card>

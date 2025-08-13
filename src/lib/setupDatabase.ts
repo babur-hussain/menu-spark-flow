@@ -224,7 +224,7 @@ export async function setupDatabase() {
           }
           acc[category.restaurant_id].push(category);
           return acc;
-        }, {} as Record<string, any[]>);
+        }, {} as Record<string, { id: string; name: string; restaurant_id: string }[]>);
 
         // Create menu items for each restaurant
         for (const restaurantId in categoriesByRestaurant) {

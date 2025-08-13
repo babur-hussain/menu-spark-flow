@@ -7,6 +7,7 @@ import qrIcon from "@/assets/qr-icon.jpg";
 import gourmetBurger from "@/assets/gourmet-burger.jpg";
 import trufflePizza from "@/assets/truffle-pizza.jpg";
 import caesarSalad from "@/assets/caesar-salad.jpg";
+import { formatCurrency } from '@/lib/utils';
 
 const QRDemo = () => {
   const [currentStep, setCurrentStep] = useState(0);
@@ -42,7 +43,7 @@ const QRDemo = () => {
   const menuItems = [
     {
       name: "Gourmet Burger",
-      price: "$18.99",
+      price: 18.99,
       description: "Juicy beef patty with artisanal cheese",
       rating: 4.8,
       image: gourmetBurger,
@@ -50,7 +51,7 @@ const QRDemo = () => {
     },
     {
       name: "Truffle Pizza",
-      price: "$24.99",
+      price: 24.99,
       description: "Hand-tossed with black truffle oil",
       rating: 4.9,
       image: trufflePizza,
@@ -58,7 +59,7 @@ const QRDemo = () => {
     },
     {
       name: "Caesar Salad",
-      price: "$14.99",
+      price: 14.99,
       description: "Fresh romaine with house-made dressing",
       rating: 4.7,
       image: caesarSalad,
@@ -201,7 +202,7 @@ const QRDemo = () => {
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-1">
                           <h4 className="font-medium">{item.name}</h4>
-                          <span className="font-bold text-primary">{item.price}</span>
+                          <span className="font-bold text-primary">{formatCurrency(item.price)}</span>
                         </div>
                         <p className="text-sm text-muted-foreground mb-1">{item.description}</p>
                         <div className="flex items-center justify-between">

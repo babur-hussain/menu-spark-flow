@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { getCachedValue, setCachedValue, withTimeout as fastTimeout } from "@/lib/fastCache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,7 +25,6 @@ import {
   Printer,
   Eye,
   Edit,
-  RefreshCw,
   BarChart3,
   Settings,
   Loader2,
@@ -62,8 +62,9 @@ export default function QRCodeManagement() {
     averageScans: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
-  const [currentRestaurant, setCurrentRestaurant] = useState<any>(null);
-  const [restaurants, setRestaurants] = useState<any[]>([]);
+  interface Restaurant { id: string; name: string }
+  const [currentRestaurant, setCurrentRestaurant] = useState<Restaurant | null>(null);
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [isLoadingRestaurants, setIsLoadingRestaurants] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -103,16 +104,32 @@ export default function QRCodeManagement() {
 
         setRestaurants(restaurants || []);
         
-        // Get the last selected restaurant from localStorage
-        const lastSelectedRestaurantId = localStorage.getItem('selectedRestaurantId');
-        
-        if (lastSelectedRestaurantId && restaurants.some(r => r.id === lastSelectedRestaurantId)) {
-          const selectedRestaurant = restaurants.find(r => r.id === lastSelectedRestaurantId);
-          setCurrentRestaurant(selectedRestaurant);
-        } else if (restaurants.length > 0) {
-          // If no saved restaurant or saved restaurant doesn't exist, use the first one
-          setCurrentRestaurant(restaurants[0]);
-          localStorage.setItem('selectedRestaurantId', restaurants[0].id);
+        // If no restaurants found, this indicates a data integrity issue
+        // Users should only access this page if they have a valid restaurant_id
+        if (!restaurants || restaurants.length === 0) {
+          console.error('CRITICAL: No restaurants found for user with restaurant_id:', user?.restaurant_id);
+          console.error('This should never happen - restaurant_id should be permanent and unique');
+          
+          // Don't create a new restaurant - this breaks the system
+          // Instead, show an error and ask user to contact support
+          toast({
+            title: "Configuration Error",
+            description: "No restaurant found for your account. This indicates a data integrity issue. Please contact support.",
+            variant: "destructive",
+          });
+          return;
+        } else {
+          // Get the last selected restaurant from localStorage
+          const lastSelectedRestaurantId = localStorage.getItem('selectedRestaurantId');
+          
+          if (lastSelectedRestaurantId && restaurants.some(r => r.id === lastSelectedRestaurantId)) {
+            const selectedRestaurant = restaurants.find(r => r.id === lastSelectedRestaurantId);
+            setCurrentRestaurant(selectedRestaurant);
+          } else if (restaurants.length > 0) {
+            // If no saved restaurant or saved restaurant doesn't exist, use the first one
+            setCurrentRestaurant(restaurants[0]);
+            localStorage.setItem('selectedRestaurantId', restaurants[0].id);
+          }
         }
       } catch (error) {
         console.error('Error fetching restaurants:', error);
@@ -122,7 +139,14 @@ export default function QRCodeManagement() {
     };
 
     fetchRestaurants();
-  }, [user?.id]);
+  }, [user?.id, toast]);
+
+  // If restaurants finished loading and none selected, stop QR loading spinner
+  useEffect(() => {
+    if (!isLoadingRestaurants && !currentRestaurant) {
+      setIsLoading(false);
+    }
+  }, [isLoadingRestaurants, currentRestaurant]);
 
   // Fetch QR codes when current restaurant changes
   useEffect(() => {
@@ -131,13 +155,21 @@ export default function QRCodeManagement() {
       
       try {
         setIsLoading(true);
-        
+        // Instant cached render
+        const cacheKey = `qr:${currentRestaurant.id}`;
+        const cached = getCachedValue<QRCode[]>(cacheKey, 60_000);
+        if (cached) {
+          setQrCodes(cached);
+          setIsLoading(false);
+        }
+
         const [qrCodesData, statsData] = await Promise.all([
-          qrCodeService.getQRCodes(currentRestaurant.id),
-          qrCodeService.getQRCodeStats(currentRestaurant.id),
+          fastTimeout(qrCodeService.getQRCodes(currentRestaurant.id), 1200, 'load qr codes'),
+          fastTimeout(qrCodeService.getQRCodeStats(currentRestaurant.id), 1200, 'load qr stats'),
         ]);
         setQrCodes(qrCodesData);
         setQrCodeStats(statsData);
+        setCachedValue(cacheKey, qrCodesData);
       } catch (error) {
         console.error('Error fetching QR codes:', error);
         toast({
@@ -154,6 +186,83 @@ export default function QRCodeManagement() {
       fetchQRCodes();
     }
   }, [user, currentRestaurant, toast]);
+
+  // Real-time subscription for QR codes
+  useEffect(() => {
+    if (!currentRestaurant) return;
+
+    const channel = supabase
+      .channel('qr-codes-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'qr_codes' }, async (payload) => {
+        console.log('Real-time QR code update:', payload);
+        
+        if (payload.eventType === 'INSERT') {
+          const newQR: any = payload.new;
+          if (newQR.restaurant_id === currentRestaurant.id) {
+            setQrCodes(prev => [newQR, ...prev]);
+            setQrCodeStats(prev => ({
+              ...prev,
+              total: prev.total + 1,
+              active: prev.active + (newQR.is_active ? 1 : 0)
+            }));
+            
+            toast({
+              title: 'New QR Code Created',
+              description: `${newQR.name} has been added`,
+            });
+          }
+        } else if (payload.eventType === 'UPDATE') {
+          const updatedQR: any = payload.new;
+          if (updatedQR.restaurant_id === currentRestaurant.id) {
+            setQrCodes(prev => prev.map(qr => 
+              qr.id === updatedQR.id ? { ...qr, ...updatedQR } : qr
+            ));
+            
+            // Update stats
+            setQrCodeStats(prev => {
+              const oldQR = qrCodes.find(q => q.id === updatedQR.id);
+              if (!oldQR) return prev;
+              
+              let activeChange = 0;
+              if (oldQR.is_active !== updatedQR.is_active) {
+                activeChange = updatedQR.is_active ? 1 : -1;
+              }
+              
+              return {
+                ...prev,
+                active: prev.active + activeChange
+              };
+            });
+            
+            toast({
+              title: 'QR Code Updated',
+              description: `${updatedQR.name} has been modified`,
+            });
+          }
+        } else if (payload.eventType === 'DELETE') {
+          const deletedQR: any = payload.old;
+          if (deletedQR.restaurant_id === currentRestaurant.id) {
+            setQrCodes(prev => prev.filter(qr => qr.id !== deletedQR.id));
+            setQrCodeStats(prev => ({
+              ...prev,
+              total: Math.max(0, prev.total - 1),
+              active: Math.max(0, prev.active - (deletedQR.is_active ? 1 : 0))
+            }));
+            
+            toast({
+              title: 'QR Code Removed',
+              description: `${deletedQR.name} has been deleted`,
+            });
+          }
+        }
+      })
+      .subscribe();
+
+    return () => {
+      console.log('Cleaning up QR codes real-time subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [currentRestaurant, toast]);
 
   const handleRestaurantChange = (restaurantId: string) => {
     const selectedRestaurant = restaurants.find(r => r.id === restaurantId);
@@ -331,7 +440,7 @@ export default function QRCodeManagement() {
   };
 
   const handleCopy = (qr: QRCode) => {
-    navigator.clipboard.writeText(qr.qr_code_url);
+    navigator.clipboard.writeText(qr.url);
     toast({
       title: "URL Copied",
       description: "QR code URL has been copied to clipboard.",

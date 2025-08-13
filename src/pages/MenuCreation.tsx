@@ -13,10 +13,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { ArrowLeft, Plus, Edit, Trash2, Upload, ImageIcon, Star, Clock, DollarSign, QrCode, Save } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, Upload, ImageIcon, Star, Clock, QrCode, Save, IndianRupee } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import QRCode from 'qrcode';
+import { formatCurrency } from '@/lib/utils';
 
 const categorySchema = z.object({
   name: z.string().min(2, 'Category name required'),
@@ -138,7 +139,7 @@ export default function MenuCreation() {
           address: restaurantData.address,
           phone: restaurantData.phone,
           email: restaurantData.email,
-          user_id: '00000000-0000-0000-0000-000000000000', // Demo user ID
+          user_id: user?.id || '',
         })
         .select()
         .single();
@@ -742,7 +743,7 @@ export default function MenuCreation() {
                                 <FormLabel>Price</FormLabel>
                                 <FormControl>
                                   <div className="relative">
-                                    <DollarSign className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                                    <IndianRupee className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                                     <Input placeholder="12.99" className="pl-10" {...field} />
                                   </div>
                                 </FormControl>
@@ -985,7 +986,7 @@ export default function MenuCreation() {
                               {item.description}
                             </p>
                             <div className="flex items-center justify-between">
-                              <span className="font-bold text-lg">${item.price}</span>
+                              <span className="font-bold text-lg">{formatCurrency(item.price)}</span>
                               <div className="flex gap-1">
                                 {item.isPopular && (
                                   <Badge variant="secondary">

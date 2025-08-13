@@ -1,4 +1,4 @@
-import { supabase } from "../integrations/supabase/client";
+import { supabase, forceRealMode } from "../integrations/supabase/client";
 
 export interface User {
   id: string;
@@ -43,44 +43,8 @@ export const userService = {
 
       if (error) {
         console.error('Error fetching users:', error);
-        // Return mock data if table doesn't exist yet
-        if (error.code === 'PGRST116' || error.message?.includes('relation "user_profiles" does not exist')) {
-          console.log('user_profiles table not found, returning mock data');
-          return [
-            {
-              id: "1",
-              email: "admin@restaurant.com",
-              role: "super_admin",
-              status: "active",
-              created_at: "2024-01-01T00:00:00Z",
-              last_login: "2024-07-28T12:00:00Z",
-              is_verified: true,
-            },
-            {
-              id: "2", 
-              email: "john@restaurant.com",
-              role: "restaurant_manager",
-              status: "active",
-              restaurant_id: "restaurant-1",
-              restaurant_name: "Pizza Palace",
-              created_at: "2024-01-15T00:00:00Z",
-              last_login: "2024-07-28T10:30:00Z",
-              is_verified: true,
-            },
-            {
-              id: "3",
-              email: "jane@restaurant.com", 
-              role: "restaurant_manager",
-              status: "active",
-              restaurant_id: "restaurant-2",
-              restaurant_name: "Burger House",
-              created_at: "2024-02-20T00:00:00Z",
-              last_login: "2024-07-27T15:45:00Z",
-              is_verified: true,
-            }
-          ];
-        }
-        throw error;
+        if (forceRealMode) throw error;
+        return [];
       }
 
       return userProfiles?.map(profile => ({
@@ -271,17 +235,8 @@ export const userService = {
 
       if (error) {
         console.error('Error fetching restaurants:', error);
-        // Return mock data if table doesn't exist yet
-        if (error.code === 'PGRST116' || error.message?.includes('relation "restaurants" does not exist')) {
-          console.log('restaurants table not found, returning mock data');
-          return [
-            { id: "restaurant-1", name: "Pizza Palace" },
-            { id: "restaurant-2", name: "Burger House" },
-            { id: "restaurant-3", name: "Sushi Express" },
-            { id: "restaurant-4", name: "Taco Fiesta" },
-          ];
-        }
-        throw error;
+        if (forceRealMode) throw error;
+        return [];
       }
 
       return restaurants || [];

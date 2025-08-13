@@ -10,7 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Minus, ShoppingCart, Star, Clock, Leaf, Flame, Heart, Sparkles, Moon, Sun, X, Check, RefreshCw, QrCode, Package, User, MapPin, Printer, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, isSupabaseDevFallback, forceRealMode } from '@/integrations/supabase/client';
+import { withTimeout as fastTimeout } from '@/lib/fastCache';
 import { orderHistoryService } from '@/lib/orderHistoryService';
 import { formatCurrency } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -104,7 +105,8 @@ export default function Order() {
   const [authName, setAuthName] = useState('');
   const [authError, setAuthError] = useState('');
   const [showOrders, setShowOrders] = useState(false);
-  const [reviews, setReviews] = useState<{[key: string]: any[]}>({});
+  interface Review { rating: number; comment: string; author?: string }
+  const [reviews, setReviews] = useState<Record<string, Review[]>>({});
   const [reviewText, setReviewText] = useState('');
   const [reviewRating, setReviewRating] = useState(5);
   const [submittingReview, setSubmittingReview] = useState(false);
@@ -119,11 +121,13 @@ export default function Order() {
   const [placingOrder, setPlacingOrder] = useState(false);
 
   // Order tracking state
-  const [lastOrder, setLastOrder] = useState<any>(null);
+  const [lastOrder, setLastOrder] = useState<LocalOrder | null>(null);
   const [showTracking, setShowTracking] = useState(false);
-  const [orderUpdates, setOrderUpdates] = useState<any>(null);
-  const [realTimeSubscription, setRealTimeSubscription] = useState<any>(null);
-  const [orderHistory, setOrderHistory] = useState<any[]>([]);
+  const [orderUpdates, setOrderUpdates] = useState<LocalOrder | null>(null);
+  const [realTimeSubscription, setRealTimeSubscription] = useState<ReturnType<typeof supabase.channel> | null>(null);
+  interface LocalOrderItem { name?: string; menu_item_name?: string; quantity: number; price: number; notes?: string }
+  interface LocalOrder { id: string; email: string; items: LocalOrderItem[]; status?: string; placedAt?: number; estReady?: number }
+  const [orderHistory, setOrderHistory] = useState<LocalOrder[]>([]);
   const [showOrderHistory, setShowOrderHistory] = useState(false);
 
   // On mount, load last order and order history from cookies
@@ -239,8 +243,81 @@ export default function Order() {
     };
   }, [lastOrder?.id]);
 
+  // Dev fallback: cross-tab real-time via localStorage when Supabase Realtime isn't available
+  useEffect(() => {
+    if (!lastOrder?.id) return;
+    if (!isSupabaseDevFallback) return;
+
+    const findLocalDemoOrder = (): any | null => {
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i) || '';
+          if (key.startsWith('demo_orders:')) {
+            const raw = localStorage.getItem(key);
+            if (!raw) continue;
+            const list = JSON.parse(raw) as any[];
+            const found = list.find(o => o.id === lastOrder.id);
+            if (found) return found;
+          }
+        }
+      } catch (e) {
+        console.warn('Error scanning demo orders:', e);
+      }
+      return null;
+    };
+
+    const applyUpdate = (newOrder: any) => {
+      setLastOrder(prev => {
+        if (!prev) return prev;
+        if (!newOrder) return prev;
+        if (prev.status === newOrder.status) return prev;
+        const updated = { ...prev, status: newOrder.status, updated_at: newOrder.updated_at } as any;
+        localStorage.setItem('last_order', JSON.stringify(updated));
+        const labelMap: Record<string, string> = {
+          pending: 'Order Placed',
+          confirmed: 'Order Confirmed',
+          preparing: 'Preparing Your Order',
+          ready: 'Your Order is Ready!',
+          completed: 'Order Completed',
+          cancelled: 'Order Cancelled'
+        };
+        toast({ title: 'Order Status Updated!', description: `Your order is now: ${labelMap[updated.status] || updated.status}` });
+        if (updated.status === 'completed' || updated.status === 'cancelled') {
+          setTimeout(() => setShowTracking(false), 5000);
+        }
+        return updated;
+      });
+    };
+
+    // Listen for cross-tab storage events
+    const onStorage = (e: StorageEvent) => {
+      if (!e.key || !e.key.startsWith('demo_orders:')) return;
+      try {
+        const list = e.newValue ? JSON.parse(e.newValue) as any[] : [];
+        const found = list.find(o => o.id === lastOrder.id);
+        if (found) applyUpdate(found);
+      } catch {}
+    };
+    window.addEventListener('storage', onStorage);
+
+    // Also poll as a safety net (covers same-tab admin actions)
+    const interval = setInterval(() => {
+      const found = findLocalDemoOrder();
+      if (found) applyUpdate(found);
+    }, 1500);
+
+    // Initial sync
+    const initial = findLocalDemoOrder();
+    if (initial) applyUpdate(initial);
+
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      clearInterval(interval);
+    };
+  }, [lastOrder?.id, isSupabaseDevFallback]);
+
   // Order tracking status logic
-  const getOrderStatus = (order: any) => {
+  const getOrderStatus = (order: LocalOrder | null) => {
     if (!order) return 'pending';
     // Use the actual status from the database if available
     if (order.status) return order.status;
@@ -263,7 +340,7 @@ export default function Order() {
       default: return status.charAt(0).toUpperCase() + status.slice(1);
     }
   };
-  const getProgress = (order: any) => {
+  const getProgress = (order: LocalOrder | null) => {
     if (!order) return 0;
     
     // Use status-based progress for database orders
@@ -285,7 +362,7 @@ export default function Order() {
     const elapsed = Math.min(now - order.placedAt, total);
     return Math.max(0, Math.min(100, (elapsed / total) * 100));
   };
-  const getEta = (order: any) => {
+  const getEta = (order: LocalOrder | null) => {
     if (!order) return '';
     
     // Use status-based ETA for database orders
@@ -483,7 +560,7 @@ export default function Order() {
   useEffect(() => {
     if (user) {
       const allOrders = JSON.parse(localStorage.getItem('order_history') || '[]');
-      setOrderHistory(allOrders.filter((o: any) => o.email === user.email));
+      setOrderHistory(allOrders.filter((o: LocalOrder) => o.email === user.email));
     }
   }, [user, showOrders]);
 
@@ -503,7 +580,7 @@ export default function Order() {
   };
 
   // Save each new order to order_history
-  const saveOrderToHistory = (order: any) => {
+  const saveOrderToHistory = (order: LocalOrder) => {
     try {
       const history = getOrderHistoryFromCookies();
       const newHistory = [order, ...history].slice(0, 50); // Keep last 50 orders
@@ -545,7 +622,7 @@ export default function Order() {
     }
   };
 
-  const generateBill = async (order: any) => {
+  const generateBill = async (order: LocalOrder) => {
     const billWindow = window.open('', '_blank', 'width=800,height=600');
     if (!billWindow) return;
 
@@ -581,7 +658,7 @@ export default function Order() {
         
         <div class="items">
           <h3>Order Items:</h3>
-          ${(order.items || []).map((item: any) => `
+          ${(order.items || []).map((item: LocalOrderItem) => `
             <div class="item">
               <span>${item.quantity}x ${item.name || item.menu_item_name}</span>
               <span>$${(item.price * item.quantity).toFixed(2)}</span>
@@ -660,76 +737,12 @@ export default function Order() {
     if (restaurantId) {
       console.log('Restaurant ID found, loading data...');
       
-      // Show demo data immediately for fast loading
-      const demoRestaurant = {
-        id: restaurantId,
-        name: "Demo Restaurant",
-        description: "A great restaurant with delicious food",
-        address: "123 Demo Street, Demo City",
-        phone: "+1-555-0123",
-        logo_url: null,
-        cover_image_url: null,
-        rating: 4.5,
-        cuisines: ["Italian", "American"]
-      };
-      
-      const demoCategories = [
-        { id: 'all', name: 'All Items', description: '', sort_order: -1 },
-        { id: '1', name: 'Appetizers', description: 'Start your meal right', sort_order: 1 },
-        { id: '2', name: 'Main Course', description: 'Delicious main dishes', sort_order: 2 },
-        { id: '3', name: 'Desserts', description: 'Sweet endings', sort_order: 3 },
-        { id: '4', name: 'Beverages', description: 'Refreshing drinks', sort_order: 4 }
-      ];
-      
-      const demoMenuItems = [
-        {
-          id: '1',
-          name: 'Margherita Pizza',
-          description: 'Classic tomato and mozzarella pizza',
-          price: 12.99,
-          image_url: null,
-          is_available: true,
-          is_featured: true,
-          preparation_time: 15,
-          dietary_info: ['Vegetarian'],
-          allergens: ['Gluten', 'Dairy'],
-          category_id: '2',
-          category: 'Main Course',
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '2',
-          name: 'Chicken Burger',
-          description: 'Juicy chicken burger with fresh vegetables',
-          price: 1.00,
-          image_url: null,
-          is_available: true,
-          is_featured: true,
-          preparation_time: 10,
-          dietary_info: [],
-          allergens: ['Gluten'],
-          category_id: '2',
-          category: 'Main Course',
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '3',
-          name: 'Caesar Salad',
-          description: 'Fresh romaine lettuce with Caesar dressing',
-          price: 8.99,
-          image_url: null,
-          is_available: true,
-          is_featured: false,
-          preparation_time: 5,
-          dietary_info: ['Vegetarian'],
-          allergens: ['Dairy'],
-          category_id: '1',
-          category: 'Appetizers',
-          created_at: new Date().toISOString()
-        }
-      ];
-      
-      // Try to load real data first, fallback to demo data if it fails
+      // In forceRealMode, never show demo data
+      if (forceRealMode) {
+        setLoading(true);
+      }
+
+      // 2) Try to load real data in the background and replace if successful
       const loadRealData = async () => {
         try {
           console.log('Attempting to fetch real data from Supabase...');
@@ -798,7 +811,6 @@ export default function Order() {
             setMenuItems(mappedMenuItems);
           }
           
-          setLoading(false);
           console.log('Real data loaded successfully from Supabase');
           
         } catch (error) {
@@ -857,28 +869,33 @@ export default function Order() {
             console.error('Retry also failed:', retryError);
           }
           
-          console.log('Falling back to demo data...');
-          
-          // Fallback to demo data
-          setRestaurant(demoRestaurant);
-          setCategories(demoCategories);
-          setMenuItems(demoMenuItems);
-          setLoading(false);
-          console.log('Demo data loaded as fallback');
+          if (forceRealMode) {
+            // In forceRealMode, show error instead of demo data
+            setError('Failed to load restaurant data. Please try again.');
+            setLoading(false);
+          } else {
+            console.log('Real data fetch failed, showing error state.');
+            setError('Failed to load restaurant data. Please check your connection.');
+            setLoading(false);
+          }
         }
       };
       
-      // Load real data
+      // Load real data (always try; will succeed only when envs are set)
       loadRealData();
       
       // Add a timeout to prevent infinite loading
       const timeoutId = setTimeout(() => {
         if (loading) {
-          console.log('Loading timeout reached, showing error');
+          console.log('Real data fetch timeout');
+          if (forceRealMode) {
+            setError('Data loading timed out. Please try again.');
+          } else {
+            setError('Data loading timed out. Please check your connection.');
+          }
           setLoading(false);
-          setError('Loading timeout. Please check your internet connection and try again.');
         }
-      }, 30000); // 30 seconds timeout for real data loading
+      }, 10000);
       
       return () => clearTimeout(timeoutId);
       
@@ -962,36 +979,10 @@ export default function Order() {
     setPlacingOrder(true);
     console.log('Starting order placement...');
 
-    // Test Supabase connection first
-    console.log('Testing Supabase connection...');
+    // Optional light preflight with tight timeout (non-blocking)
     try {
-      const { data: testData, error: testError } = await supabase
-        .from('orders')
-        .select('count')
-        .limit(1);
-      
-      if (testError) {
-        console.error('Supabase connection test failed:', testError);
-        toast({
-          title: "Connection Error",
-          description: "Cannot connect to the server. Please check your internet connection.",
-          variant: "destructive",
-        });
-        setPlacingOrder(false);
-        return;
-      }
-      
-      console.log('Supabase connection test successful');
-    } catch (connectionError) {
-      console.error('Supabase connection error:', connectionError);
-      toast({
-        title: "Connection Error",
-        description: "Cannot connect to the server. Please check your internet connection.",
-        variant: "destructive",
-      });
-      setPlacingOrder(false);
-      return;
-    }
+      await fastTimeout(supabase.from('orders').select('id').limit(1), 2500, 'preflight');
+    } catch (_) {}
 
     // Try to create order in Supabase
     console.log('Attempting to create order in Supabase...');
@@ -1018,12 +1009,16 @@ export default function Order() {
       console.log('Creating order with data:', orderData);
       console.log('Restaurant ID being used:', restaurant.id);
 
-      // Create order in Supabase without timeout
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert([orderData])
-        .select()
-        .single();
+      // Create order in Supabase with reasonable timeout
+      const { data: order, error: orderError } = await fastTimeout(
+        supabase
+          .from('orders')
+          .insert([orderData])
+          .select()
+          .single(),
+        15000,
+        'create order'
+      );
 
       console.log('Order creation result:', { data: order, error: orderError });
 
@@ -1052,10 +1047,14 @@ export default function Order() {
 
       console.log('Creating order items:', orderItemsData);
 
-      // Create order items in Supabase without timeout
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItemsData);
+      // Create order items in Supabase with reasonable timeout
+      const { error: itemsError } = await fastTimeout(
+        supabase
+          .from('order_items')
+          .insert(orderItemsData),
+        15000,
+        'create order items'
+      );
 
       console.log('Order items creation result:', { error: itemsError });
 
@@ -1136,7 +1135,7 @@ export default function Order() {
       // Show error to user and ask to retry
       toast({
         title: "Order Placement Failed",
-        description: "Failed to place order online. Please check your connection and try again.",
+        description: "Could not place your order. Check internet and permissions; please try again.",
         variant: "destructive",
       });
       
@@ -2064,7 +2063,7 @@ export default function Order() {
                   <div className="text-sm text-gray-600 dark:text-gray-300 mb-3">
                     <div className="font-medium mb-1">Items:</div>
                     <div className="space-y-1">
-                      {(order.items || []).slice(0, 3).map((item: any, itemIndex: number) => (
+                      {(order.items || []).slice(0, 3).map((item: LocalOrderItem, itemIndex: number) => (
                         <div key={itemIndex} className="flex justify-between">
                           <span>{item.quantity}x {item.name || item.menu_item_name}</span>
                           <span>${(item.price * item.quantity).toFixed(2)}</span>

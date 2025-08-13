@@ -103,11 +103,12 @@ export function EditUserModal({ open, onOpenChange, user, onUserUpdated }: EditU
       
       onUserUpdated();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating user:', error);
+      const message = error instanceof Error ? error.message : 'Failed to update user. Please try again.';
       toast({
         title: "Error",
-        description: error.message || "Failed to update user. Please try again.",
+        description: message,
         variant: "destructive",
       });
     } finally {

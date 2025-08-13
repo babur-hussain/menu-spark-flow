@@ -35,13 +35,15 @@ export const qrCodeService = {
 
       if (error) {
         console.error('Error fetching QR codes:', error);
-        throw error;
+        // Demo fallback: return empty array instead of throwing to avoid infinite loading
+        return [];
       }
 
       return data || [];
     } catch (error) {
       console.error('Error in getQRCodes:', error);
-      throw error;
+      // Fail-soft
+      return [];
     }
   },
 
@@ -177,7 +179,7 @@ export const qrCodeService = {
 
       if (error) {
         console.error('Error fetching QR code stats:', error);
-        throw error;
+        return { total: 0, active: 0, inactive: 0, totalScans: 0, averageScans: 0 };
       }
 
       const total = data.length;
@@ -195,7 +197,7 @@ export const qrCodeService = {
       };
     } catch (error) {
       console.error('Error in getQRCodeStats:', error);
-      throw error;
+      return { total: 0, active: 0, inactive: 0, totalScans: 0, averageScans: 0 };
     }
   },
 }; 

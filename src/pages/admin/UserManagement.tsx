@@ -27,7 +27,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { userService, User } from "@/lib/userService";
 import { AddUserModal } from "@/components/admin/AddUserModal";
 import { EditUserModal } from "@/components/admin/EditUserModal";
-import { simpleSetupDatabase } from "@/lib/simpleSetup";
+// Removed auto-setup requirement for a no-setup demo experience
 
 interface UserDisplay {
   id: string;
@@ -54,22 +54,7 @@ export default function UserManagement() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
-  // Auto-setup database when component mounts
-  useEffect(() => {
-    const autoSetupDatabase = async () => {
-      try {
-        console.log("Auto-setting up database in UserManagement...");
-        await simpleSetupDatabase();
-        console.log("Database auto-setup completed in UserManagement");
-      } catch (error) {
-        console.error('Error in auto database setup:', error);
-      }
-    };
-
-    // Run auto-setup after a short delay
-    const timer = setTimeout(autoSetupDatabase, 1000);
-    return () => clearTimeout(timer);
-  }, []);
+  // No auto-setup: run as-is using live data if available, otherwise mock data is shown
 
   useEffect(() => {
     fetchUsers();
@@ -114,11 +99,12 @@ export default function UserManagement() {
         description: "User deleted successfully.",
       });
       fetchUsers(); // Refresh the list
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting user:', error);
+      const message = error instanceof Error ? error.message : 'Failed to delete user. Please try again.';
       toast({
         title: "Error",
-        description: error.message || "Failed to delete user. Please try again.",
+        description: message,
         variant: "destructive",
       });
     }

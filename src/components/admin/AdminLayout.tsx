@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { getCachedValue, setCachedValue } from "@/lib/fastCache";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar } from "./AdminSidebar";
 import { Button } from "@/components/ui/button";
@@ -32,9 +33,21 @@ export function AdminLayout({ children, userRole, restaurantName }: AdminLayoutP
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     if (user?.id) {
-      fetchUserProfile();
+      // Wrap in a timeout to avoid infinite spinner if table/policies are misconfigured
+      const run = async () => {
+        try {
+          await fetchUserProfile();
+        } catch (e) {
+          if (!cancelled) setIsLoadingProfile(false);
+        }
+      };
+      run();
+    } else {
+      setIsLoadingProfile(false);
     }
+    return () => { cancelled = true };
   }, [user?.id]);
 
   const fetchUserProfile = async () => {
@@ -47,6 +60,15 @@ export function AdminLayout({ children, userRole, restaurantName }: AdminLayoutP
         console.log('🚨 Profile loading timeout - likely schema issue 🚨');
         console.log('Please run the database schema update first');
       }, 3000); // 3 second timeout
+
+      // Try to hydrate immediately from cache for instant header name
+      const cacheKey = user?.id ? `user_profile:${user.id}` : '';
+      if (cacheKey) {
+        const cached = getCachedValue<UserProfile>(cacheKey, 60_000);
+        if (cached) {
+          setUserProfile(cached);
+        }
+      }
 
       const { data, error } = await supabase
         .from('user_profiles')
@@ -74,6 +96,7 @@ export function AdminLayout({ children, userRole, restaurantName }: AdminLayoutP
         }
       } else if (data) {
         setUserProfile(data);
+        if (cacheKey) setCachedValue(cacheKey, data);
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);

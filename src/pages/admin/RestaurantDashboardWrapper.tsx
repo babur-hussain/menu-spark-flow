@@ -4,6 +4,9 @@ import RestaurantDashboard from './RestaurantDashboard';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function RestaurantDashboardWrapper() {
   const { user, isLoading } = useAuth();
@@ -41,6 +44,37 @@ export default function RestaurantDashboardWrapper() {
     );
   }
 
+  const [creating, setCreating] = useState(false);
+
+  const handleCreateRestaurant = async () => {
+    try {
+      setCreating(true);
+      const name = (user as any)?.preferred_restaurant_name || user.email.split('@')[0] + "'s Restaurant";
+      const email = user.email;
+      const { data, error } = await supabase
+        .from('restaurants')
+        .insert({
+          user_id: user.id,
+          name,
+          email,
+          is_active: true,
+        })
+        .select('id')
+        .single();
+
+      if (!error && data?.id) {
+        await supabase
+          .from('user_profiles')
+          .update({ restaurant_id: data.id })
+          .eq('id', user.id);
+        // Hard refresh to reload context
+        window.location.reload();
+      }
+    } finally {
+      setCreating(false);
+    }
+  };
+
   if (!user.restaurant_id) {
     return (
       <AdminLayout userRole="restaurant_manager">
@@ -52,8 +86,13 @@ export default function RestaurantDashboardWrapper() {
                 <h2 className="text-lg font-semibold">No Restaurant Assigned</h2>
               </div>
               <p className="text-muted-foreground">
-                Your account is not associated with any restaurant. Please contact the administrator.
+                Your account is not associated with any restaurant.
               </p>
+              <div className="mt-4 flex gap-2">
+                <Button onClick={handleCreateRestaurant} disabled={creating}>
+                  {creating ? 'Creating…' : 'Create My Restaurant'}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

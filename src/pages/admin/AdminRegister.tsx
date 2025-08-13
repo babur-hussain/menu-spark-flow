@@ -112,7 +112,7 @@ export default function AdminRegister() {
           setTimeout(() => {
             toast({
               title: "Rate Limiting",
-              description: "You can try again in a few minutes, or use the demo credentials to explore the system.",
+              description: "You can try again in a few minutes, or contact support if you need assistance.",
               variant: "default",
             });
           }, 2000);

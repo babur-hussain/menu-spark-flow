@@ -56,7 +56,7 @@ const restaurantSchema = z.object({
   email: z.string().email("Valid email is required"),
   website: z.string().url("Valid website URL is required").optional().or(z.literal("")),
   cuisine_type: z.string().min(1, "Cuisine type is required"),
-  price_range: z.enum(["$", "$$", "$$$", "$$$$"]),
+  price_range: z.enum(["₹", "₹₹", "₹₹₹", "₹₹₹₹"]),
   capacity: z.string().min(1, "Capacity is required"),
 });
 
@@ -109,7 +109,7 @@ export default function Settings() {
       email: "info@radissonblu.com",
       website: "https://www.radissonblu.com",
       cuisine_type: "Contemporary American",
-      price_range: "$$$",
+      price_range: "₹₹₹",
       capacity: "120",
     },
   });
@@ -308,10 +308,10 @@ export default function Settings() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="$">$ (Under $15)</SelectItem>
-                                <SelectItem value="$$">$$ ($15-$30)</SelectItem>
-                                <SelectItem value="$$$">$$$ ($31-$60)</SelectItem>
-                                <SelectItem value="$$$$">$$$$ (Over $60)</SelectItem>
+                                <SelectItem value="₹">₹ (Under ₹500)</SelectItem>
+                                <SelectItem value="₹₹">₹₹ (₹500-₹1000)</SelectItem>
+                                <SelectItem value="₹₹₹">₹₹₹ (₹1000-₹2000)</SelectItem>
+                                <SelectItem value="₹₹₹₹">₹₹₹₹ (Over ₹2000)</SelectItem>
                               </SelectContent>
                             </Select>
                             <FormMessage />

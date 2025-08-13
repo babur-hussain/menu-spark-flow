@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { getCachedValue, setCachedValue, withTimeout as fastTimeout } from "@/lib/fastCache";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -22,6 +23,7 @@ import { LogoutButton } from "@/components/auth/LogoutButton";
 import { useAuth } from "@/contexts/AuthContext";
 import { analyticsService } from "@/lib/analytics";
 import { simpleSetupDatabase } from "@/lib/simpleSetup";
+import { formatCurrency } from '@/lib/utils';
 
 interface AnalyticsData {
   totalRestaurants: number;
@@ -64,9 +66,13 @@ export default function GlobalAnalytics() {
       try {
         setIsLoading(true);
         setError(null);
-        
-        const data = await analyticsService.getAllAnalyticsData();
+        // Instant cached view
+        const cached = getCachedValue<AnalyticsData>('ga:analytics', 30_000);
+        if (cached) setAnalyticsData(cached);
+
+        const data = await fastTimeout(analyticsService.getAllAnalyticsData(), 1200, 'load analytics');
         setAnalyticsData(data);
+        setCachedValue('ga:analytics', data);
       } catch (error) {
         console.error('Error fetching analytics:', error);
         setError('Failed to load analytics data');
@@ -160,7 +166,7 @@ export default function GlobalAnalytics() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${analyticsData?.totalRevenue?.toFixed(2) || '0.00'}</div>
+              <div className="text-2xl font-bold">{formatCurrency(analyticsData?.totalRevenue || 0)}</div>
               <p className="text-xs text-muted-foreground">
                 <TrendingUp className="inline h-3 w-3 text-green-600" />
                 +{analyticsData?.growthRate || 0}% from last month
@@ -248,7 +254,7 @@ export default function GlobalAnalytics() {
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-bold text-green-600">
-                        ${restaurant.revenue.toFixed(2)}
+                        {formatCurrency(restaurant.revenue)}
                       </div>
                       <p className="text-sm text-muted-foreground">Revenue</p>
                     </div>

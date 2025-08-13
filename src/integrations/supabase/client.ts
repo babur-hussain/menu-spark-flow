@@ -2,11 +2,42 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = "https://arexjpknfknerwtwycpr.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFyZXhqcGtuZmtuZXJ3dHd5Y3ByIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM2NDcwODcsImV4cCI6MjA2OTIyMzA4N30.eWBni54xHVnkKCo5wTQB9HVZZtmhkZL7AwMHZzuubos";
+const ENV_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const ENV_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+const FORCE_REAL = true; // Always force real mode - no demo fallbacks
+
+// Strict-validate when envs are provided
+if (ENV_URL && !/^https?:\/\/.+\.supabase\.co/i.test(ENV_URL)) {
+  console.error(
+    `Invalid VITE_SUPABASE_URL: ${ENV_URL}. Expected https://xxxxxxxxxxxxxxxxxxxx.supabase.co`
+  );
+}
+
+// Check if environment variables are properly configured
+export const isSupabaseConfigured = !!(ENV_URL && ENV_ANON);
+
+// Always require real Supabase connection
+if (!ENV_URL || !ENV_ANON) {
+  console.error('🚨 Missing Supabase environment variables!');
+  console.error('📝 Create a .env file in your project root with:');
+  console.error('   VITE_SUPABASE_URL=https://your-project-id.supabase.co');
+  console.error('   VITE_SUPABASE_ANON_KEY=your-anon-key-here');
+  console.error('🔗 Get these from: https://supabase.com/dashboard/project/[YOUR_PROJECT]/settings/api');
+  console.error('📖 See ENVIRONMENT_SETUP.md for detailed instructions');
+  
+  // Don't throw an error immediately - let the app handle it gracefully
+  console.warn('⚠️ Supabase not configured - app will show setup instructions');
+}
+
+// Create Supabase client with fallback for missing environment variables
+const SUPABASE_URL = ENV_URL || 'https://example.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = ENV_ANON || 'fallback-key';
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
+
+export const isSupabaseDevFallback = !isSupabaseConfigured;
+export const forceRealMode = isSupabaseConfigured;
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {

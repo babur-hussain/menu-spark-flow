@@ -47,6 +47,14 @@ export interface CreateMenuItemData {
 }
 
 export const menuService = {
+  async getCategoryName(categoryId: string): Promise<string> {
+    const { data } = await supabase
+      .from('menu_categories')
+      .select('name')
+      .eq('id', categoryId)
+      .single();
+    return data?.name || 'Uncategorized';
+  },
   async getMenuItems(restaurantId: string): Promise<MenuItem[]> {
     try {
       // First, get or create default categories for the restaurant
@@ -150,17 +158,8 @@ export const menuService = {
       // Get or create the category
       const categoryId = await this.getOrCreateCategory(restaurantId, menuItem.category);
 
-      // Prepare dietary info array
-      const dietaryInfo = [];
-      if (menuItem.is_vegetarian) dietaryInfo.push('vegetarian');
-      if (menuItem.is_vegan) dietaryInfo.push('vegan');
-      if (menuItem.is_gluten_free) dietaryInfo.push('gluten_free');
-      if (menuItem.is_spicy) dietaryInfo.push('spicy');
-      if (menuItem.is_featured) dietaryInfo.push('featured');
-      // Add custom dietary info
-      if (menuItem.dietary_info) {
-        dietaryInfo.push(...menuItem.dietary_info);
-      }
+      // Some deployments may not include optional columns (addons/variants/dietary_info/badges/calories/allergens)
+      // Insert with a minimal, widely compatible payload
 
       const { data, error } = await supabase
         .from('menu_items')
@@ -171,19 +170,10 @@ export const menuService = {
           description: menuItem.description,
           price: menuItem.price,
           preparation_time: menuItem.preparation_time,
-          calories: menuItem.calories,
-          allergens: menuItem.allergens,
-          dietary_info: dietaryInfo,
-          addons: menuItem.addons || [],
-          variants: menuItem.variants || [],
-          badges: menuItem.badges || [],
           is_available: menuItem.is_available,
           image_url: menuItem.image_url,
         })
-        .select(`
-          *,
-          menu_categories!inner(name)
-        `)
+        .select(`*`)
         .single();
 
       if (error) {
@@ -192,19 +182,20 @@ export const menuService = {
       }
 
       // Transform the response to match our interface
+      const categoryName = await this.getCategoryName(data.category_id);
       return {
         ...data,
-        category: data.menu_categories?.name || 'Uncategorized',
-        is_vegetarian: data.dietary_info?.includes('vegetarian') || false,
-        is_vegan: data.dietary_info?.includes('vegan') || false,
-        is_gluten_free: data.dietary_info?.includes('gluten_free') || false,
-        is_featured: data.dietary_info?.includes('featured') || false,
-        is_spicy: data.dietary_info?.includes('spicy') || false,
-        dietary_info: data.dietary_info || [],
-        addons: data.addons || [],
-        variants: data.variants || [],
-        badges: data.badges || [],
-        calories: undefined, // Not in DB schema
+        category: categoryName,
+        is_vegetarian: false,
+        is_vegan: false,
+        is_gluten_free: false,
+        is_featured: false,
+        is_spicy: false,
+        dietary_info: [],
+        addons: [],
+        variants: [],
+        badges: [],
+        calories: undefined,
       };
     } catch (error) {
       console.error('Error in createMenuItem:', error);
@@ -262,13 +253,7 @@ export const menuService = {
         }
       }
 
-      // Convert dietary info
-      const dietaryInfo = [];
-      if (updates.is_vegetarian) dietaryInfo.push('vegetarian');
-      if (updates.is_vegan) dietaryInfo.push('vegan');
-      if (updates.is_gluten_free) dietaryInfo.push('gluten_free');
-
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         ...updates,
         updated_at: new Date().toISOString(),
       };
@@ -278,10 +263,7 @@ export const menuService = {
         delete updateData.category;
       }
 
-      if (dietaryInfo.length > 0) {
-        updateData.dietary_info = dietaryInfo;
-      }
-
+      // Remove flags not present in minimal schema
       delete updateData.is_vegetarian;
       delete updateData.is_vegan;
       delete updateData.is_gluten_free;
@@ -290,10 +272,7 @@ export const menuService = {
         .from('menu_items')
         .update(updateData)
         .eq('id', id)
-        .select(`
-          *,
-          menu_categories!inner(name)
-        `)
+        .select(`*`)
         .single();
 
       if (error) {
@@ -301,9 +280,10 @@ export const menuService = {
         throw error;
       }
 
+      const categoryName = await this.getCategoryName(data.category_id);
       return {
         ...data,
-        category: data.menu_categories?.name || 'Uncategorized',
+        category: categoryName,
         is_vegetarian: data.dietary_info?.includes('vegetarian') || false,
         is_vegan: data.dietary_info?.includes('vegan') || false,
         is_gluten_free: data.dietary_info?.includes('gluten_free') || false,
@@ -341,10 +321,7 @@ export const menuService = {
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)
-        .select(`
-          *,
-          menu_categories!inner(name)
-        `)
+        .select(`*`)
         .single();
 
       if (error) {
@@ -352,9 +329,10 @@ export const menuService = {
         throw error;
       }
 
+      const categoryName = await this.getCategoryName(data.category_id);
       return {
         ...data,
-        category: data.menu_categories?.name || 'Uncategorized',
+        category: categoryName,
         is_vegetarian: data.dietary_info?.includes('vegetarian') || false,
         is_vegan: data.dietary_info?.includes('vegan') || false,
         is_gluten_free: data.dietary_info?.includes('gluten_free') || false,

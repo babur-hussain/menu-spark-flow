@@ -35,7 +35,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        await refreshUser();
+        // Recover demo user quickly if present
+        const isDefault = localStorage.getItem('is_default_user') === 'true';
+        if (isDefault) {
+          const du = localStorage.getItem('default_user');
+          if (du) setUser(JSON.parse(du));
+        } else {
+          await refreshUser();
+        }
       } catch (error) {
         console.error('Error initializing auth:', error);
       } finally {

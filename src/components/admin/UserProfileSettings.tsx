@@ -112,7 +112,7 @@ export function UserProfileSettings() {
       }, 5000); // 5 second timeout
 
       // Try to update with all fields, but handle missing columns gracefully
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         id: user.id,
         email: user.email || "",
         updated_at: new Date().toISOString()

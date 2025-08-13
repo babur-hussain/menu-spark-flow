@@ -1,5 +1,20 @@
 import { supabase } from "@/integrations/supabase/client";
 
+// Fail-safe timeout wrapper to prevent infinite loading states when network stalls
+async function withTimeout<T>(promise: Promise<T>, timeoutMs = 8000, label = "request"): Promise<T> {
+  try {
+    const timeout = new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs)
+    );
+    // Race the actual promise with a timeout
+    // @ts-expect-error: Promise.race typing is fine here
+    return await Promise.race([promise, timeout]);
+  } catch (error) {
+    console.error(`[analytics] ${label} failed:`, error);
+    throw error;
+  }
+}
+
 export interface DashboardStats {
   totalRestaurants: number;
   totalUsers: number;
@@ -43,19 +58,31 @@ class AnalyticsService {
   async getDashboardStats(): Promise<DashboardStats> {
     try {
       // Get total restaurants
-      const { count: totalRestaurants } = await supabase
+      const { count: totalRestaurants } = await withTimeout(
+        supabase
         .from('restaurants')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true }),
+        8000,
+        'count restaurants'
+      );
 
       // Get total users (from user_profiles)
-      const { count: totalUsers } = await supabase
+      const { count: totalUsers } = await withTimeout(
+        supabase
         .from('user_profiles')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true }),
+        8000,
+        'count user_profiles'
+      );
 
       // Calculate total revenue from orders
-      const { data: orders } = await supabase
+      const { data: orders } = await withTimeout(
+        supabase
         .from('orders')
-        .select('total_amount, created_at');
+        .select('total_amount, created_at'),
+        8000,
+        'fetch orders for totals'
+      );
 
       const totalRevenue = orders?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
 
@@ -101,10 +128,14 @@ class AnalyticsService {
 
   async getRestaurants(): Promise<Restaurant[]> {
     try {
-      const { data: restaurants, error } = await supabase
+      const { data: restaurants, error } = await withTimeout(
+        supabase
         .from('restaurants')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }),
+        8000,
+        'fetch restaurants'
+      );
 
       if (error) {
         console.error('Error fetching restaurants:', error);
@@ -115,10 +146,14 @@ class AnalyticsService {
       const restaurantsWithStats = await Promise.all(
         restaurants.map(async (restaurant) => {
           // Get orders for this restaurant
-          const { data: orders } = await supabase
+          const { data: orders } = await withTimeout(
+            supabase
             .from('orders')
             .select('total_amount, created_at')
-            .eq('restaurant_id', restaurant.id);
+            .eq('restaurant_id', restaurant.id),
+            8000,
+            `fetch orders for restaurant ${restaurant.id}`
+          );
 
           const totalOrders = orders?.length || 0;
           const monthlyRevenue = orders?.reduce((sum, order) => {
@@ -162,14 +197,18 @@ class AnalyticsService {
   async getSystemActivities(): Promise<SystemActivity[]> {
     try {
       // Get recent orders as activities
-      const { data: recentOrders } = await supabase
+      const { data: recentOrders } = await withTimeout(
+        supabase
         .from('orders')
         .select(`
           *,
           restaurants!orders_restaurant_id_fkey(name)
         `)
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(10),
+        8000,
+        'fetch recent orders'
+      );
 
       const activities: SystemActivity[] = [];
 
@@ -189,32 +228,7 @@ class AnalyticsService {
         });
       }
 
-      // Add some mock activities for demonstration
-      const mockActivities: SystemActivity[] = [
-        {
-          id: 'mock-1',
-          type: 'new_restaurant',
-          message: 'Ocean Breeze Cafe submitted registration',
-          timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-          restaurant_name: 'Ocean Breeze Cafe'
-        },
-        {
-          id: 'mock-2',
-          type: 'payment',
-          message: 'Bella Vista Restaurant paid monthly subscription',
-          timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-          restaurant_name: 'Bella Vista Restaurant'
-        },
-        {
-          id: 'mock-3',
-          type: 'milestone',
-          message: 'Mountain View Bistro reached 1000 orders',
-          timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-          restaurant_name: 'Mountain View Bistro'
-        }
-      ];
-
-      return [...activities, ...mockActivities].sort((a, b) => 
+      return activities.sort((a, b) => 
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       ).slice(0, 10);
     } catch (error) {
@@ -225,10 +239,14 @@ class AnalyticsService {
 
   async getRevenueData(): Promise<{ month: string; revenue: number }[]> {
     try {
-      const { data: orders } = await supabase
+      const { data: orders } = await withTimeout(
+        supabase
         .from('orders')
         .select('total_amount, created_at')
-        .gte('created_at', new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000).toISOString());
+        .gte('created_at', new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000).toISOString()),
+        8000,
+        'fetch revenue window orders'
+      );
 
       if (!orders) return [];
 
@@ -254,10 +272,14 @@ class AnalyticsService {
 
   async getOrderData(): Promise<{ month: string; orders: number }[]> {
     try {
-      const { data: orders } = await supabase
+      const { data: orders } = await withTimeout(
+        supabase
         .from('orders')
         .select('created_at')
-        .gte('created_at', new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000).toISOString());
+        .gte('created_at', new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000).toISOString()),
+        8000,
+        'fetch orders window for counts'
+      );
 
       if (!orders) return [];
 

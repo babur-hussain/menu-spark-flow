@@ -28,6 +28,7 @@ import {
   QrCode,
   BarChart3,
 } from "lucide-react";
+import { formatCurrency } from '@/lib/utils';
 
 export default function SuperAdminDashboard() {
   const { user } = useAuth();
@@ -147,7 +148,7 @@ export default function SuperAdminDashboard() {
     },
     {
       title: "Total Revenue",
-      value: `$${(analyticsData.totalRevenue || 0).toFixed(2)}`,
+      value: formatCurrency(analyticsData.totalRevenue || 0),
       change: analyticsData.revenueGrowth || 0,
       icon: DollarSign,
       color: "text-purple-600",

@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { getCachedValue, setCachedValue, withTimeout as fastTimeout } from "@/lib/fastCache";
+import { formatCurrency } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -64,7 +66,7 @@ export default function RestaurantDashboard({ restaurantId }: RestaurantDashboar
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [realTimeSubscription, setRealTimeSubscription] = useState<any>(null);
+  const [realTimeSubscription, setRealTimeSubscription] = useState<ReturnType<typeof supabase.channel> | null>(null);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [isUpdatingOrder, setIsUpdatingOrder] = useState(false);
   const [stats, setStats] = useState({
@@ -74,10 +76,20 @@ export default function RestaurantDashboard({ restaurantId }: RestaurantDashboar
     readyOrders: 0,
     totalRevenue: 0
   });
+  const [restaurantName, setRestaurantName] = useState<string>('');
   const { toast } = useToast();
 
-  // Load initial orders
+  // Load initial orders and restaurant name
   useEffect(() => {
+    const loadRestaurant = async () => {
+      const { data } = await supabase
+        .from('restaurants')
+        .select('name')
+        .eq('id', restaurantId)
+        .single();
+      if (data?.name) setRestaurantName(data.name);
+    };
+    loadRestaurant();
     loadOrders();
     setupRealTimeSubscription();
   }, [restaurantId]);
@@ -95,22 +107,33 @@ export default function RestaurantDashboard({ restaurantId }: RestaurantDashboar
     try {
       setLoading(true);
       console.log('Loading orders for restaurant:', restaurantId);
+      // Instant cached UI for orders
+      const cacheKey = `dashboard_orders:${restaurantId}`;
+      const cached = getCachedValue<Order[]>(cacheKey, 15000);
+      if (cached) {
+        setOrders(cached);
+        setLoading(false);
+      }
       
       // Fetch orders for this restaurant
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          order_items (
+      const { data: ordersData, error: ordersError } = await fastTimeout(
+        supabase
+          .from('orders')
+          .select(`
             *,
-            menu_item:menu_items (
-              name,
-              description
+            order_items (
+              *,
+              menu_item:menu_items (
+                name,
+                description
+              )
             )
-          )
-        `)
-        .eq('restaurant_id', restaurantId)
-        .order('created_at', { ascending: false });
+          `)
+          .eq('restaurant_id', restaurantId)
+          .order('created_at', { ascending: false }),
+        1200,
+        'load dashboard orders'
+      );
 
       if (ordersError) {
         console.error('Error loading orders:', ordersError);
@@ -132,6 +155,7 @@ export default function RestaurantDashboard({ restaurantId }: RestaurantDashboar
       }
       
       setOrders(ordersData || []);
+      setCachedValue(cacheKey, ordersData || []);
       updateStats(ordersData || []);
       
     } catch (error) {
@@ -374,7 +398,7 @@ export default function RestaurantDashboard({ restaurantId }: RestaurantDashboar
   };
 
   return (
-    <AdminLayout userRole="restaurant_manager">
+    <AdminLayout userRole="restaurant_manager" restaurantName={restaurantName || undefined}>
       <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -462,7 +486,7 @@ export default function RestaurantDashboard({ restaurantId }: RestaurantDashboar
               </div>
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Revenue</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">${stats.totalRevenue.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{formatCurrency(stats.totalRevenue)}</p>
               </div>
             </div>
           </CardContent>

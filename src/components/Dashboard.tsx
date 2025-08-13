@@ -14,12 +14,13 @@ import {
   ArrowDown
 } from "lucide-react";
 import dashboardPreview from "@/assets/dashboard-preview.jpg";
+import { formatCurrency } from '@/lib/utils';
 
 const Dashboard = () => {
   const stats = [
     {
       title: "Total Revenue",
-      value: "$12,847",
+      value: formatCurrency(12847),
       change: "+12.5%",
       changeType: "increase",
       icon: DollarSign,
@@ -43,7 +44,7 @@ const Dashboard = () => {
     },
     {
       title: "Avg. Order Value",
-      value: "$82.43",
+      value: formatCurrency(82.43),
       change: "-2.1%",
       changeType: "decrease",
       icon: BarChart3,
@@ -52,10 +53,10 @@ const Dashboard = () => {
   ];
 
   const topDishes = [
-    { name: "Gourmet Burger", orders: 24, revenue: "$431.76", trend: "up" },
-    { name: "Truffle Pizza", orders: 18, revenue: "$449.82", trend: "up" },
-    { name: "Caesar Salad", orders: 15, revenue: "$224.85", trend: "down" },
-    { name: "Salmon Teriyaki", orders: 12, revenue: "$359.88", trend: "up" }
+    { name: "Gourmet Burger", orders: 24, revenue: formatCurrency(431.76), trend: "up" },
+    { name: "Truffle Pizza", orders: 18, revenue: formatCurrency(449.82), trend: "up" },
+    { name: "Caesar Salad", orders: 15, revenue: formatCurrency(224.85), trend: "down" },
+    { name: "Salmon Teriyaki", orders: 12, revenue: formatCurrency(359.88), trend: "up" }
   ];
 
   const recentOrders = [

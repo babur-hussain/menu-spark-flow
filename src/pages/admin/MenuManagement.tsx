@@ -38,6 +38,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { menuService, MenuItem, CreateMenuItemData } from "@/lib/menuService";
 import { restaurantService } from "@/lib/restaurantService";
 import { supabase } from "@/integrations/supabase/client";
+import { formatCurrency } from '@/lib/utils';
 
 const menuItemSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -114,8 +115,9 @@ export default function MenuManagement() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [currentRestaurant, setCurrentRestaurant] = useState<any>(null);
-  const [restaurants, setRestaurants] = useState<any[]>([]);
+  interface Restaurant { id: string; name: string }
+  const [currentRestaurant, setCurrentRestaurant] = useState<Restaurant | null>(null);
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [isLoadingRestaurants, setIsLoadingRestaurants] = useState(true);
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -281,7 +283,7 @@ export default function MenuManagement() {
         badges: selectedBadges,
       };
 
-      await menuService.createMenuItem(menuItemData);
+      await menuService.createMenuItem(currentRestaurant.id, menuItemData);
 
       toast({
         title: "Success",
@@ -526,7 +528,7 @@ export default function MenuManagement() {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Price</span>
-                      <span className="font-semibold">${item.price}</span>
+                      <span className="font-semibold">{formatCurrency(item.price)}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Category</span>

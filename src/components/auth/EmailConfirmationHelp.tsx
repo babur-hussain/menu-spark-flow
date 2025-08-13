@@ -133,7 +133,7 @@ export function EmailConfirmationHelp({ email, onClose }: EmailConfirmationHelpP
                 Can't find the email?
               </p>
               <p className="text-xs text-yellow-700 dark:text-yellow-300">
-                Check your spam folder or try using the demo credentials to explore the system while waiting.
+                Check your spam folder or contact support if you need assistance.
               </p>
             </div>
           </div>

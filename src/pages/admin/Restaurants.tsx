@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { getCachedValue, setCachedValue, withTimeout as fastTimeout } from "@/lib/fastCache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +29,7 @@ import { LogoutButton } from "@/components/auth/LogoutButton";
 import { useAuth } from "@/contexts/AuthContext";
 import { analyticsService } from "@/lib/analytics";
 import { simpleSetupDatabase } from "@/lib/simpleSetup";
+import { formatCurrency } from '@/lib/utils';
 
 interface Restaurant {
   id: string;
@@ -75,9 +77,13 @@ export default function Restaurants() {
       try {
         setIsLoading(true);
         setError(null);
-        
-        const restaurantsData = await analyticsService.getRestaurants();
+        // Instant cached view
+        const cached = getCachedValue<Restaurant[]>('sa:restaurants', 30_000);
+        if (cached) setRestaurants(cached);
+
+        const restaurantsData = await fastTimeout(analyticsService.getRestaurants(), 1200, 'load restaurants');
         setRestaurants(restaurantsData);
+        setCachedValue('sa:restaurants', restaurantsData);
       } catch (error) {
         console.error('Error fetching restaurants:', error);
         setError('Failed to load restaurants');
@@ -241,7 +247,7 @@ export default function Restaurants() {
                     </div>
                     <div className="text-center">
                       <div className="text-2xl font-bold text-green-600">
-                        ${restaurant.monthlyRevenue.toFixed(2)}
+                        {formatCurrency(restaurant.monthlyRevenue)}
                       </div>
                       <div className="text-xs text-muted-foreground">Revenue</div>
                     </div>

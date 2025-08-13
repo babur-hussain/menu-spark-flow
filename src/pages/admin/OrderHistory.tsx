@@ -24,12 +24,20 @@ import { useAuth } from '@/contexts/AuthContext';
 import { orderHistoryService, OrderHistoryEntry } from '@/lib/orderHistoryService';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { useToast } from '@/hooks/use-toast';
+import { formatCurrency } from '@/lib/utils';
 
 export default function OrderHistory() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [orders, setOrders] = useState<OrderHistoryEntry[]>([]);
-  const [stats, setStats] = useState<any>({});
+  const [stats, setStats] = useState<{
+    total?: number;
+    completed?: number;
+    cancelled?: number;
+    totalRevenue?: number;
+    averageOrderValue?: number;
+    billGeneratedCount?: number;
+  }>({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -45,7 +53,14 @@ export default function OrderHistory() {
       setLoading(true);
       
       let ordersData: OrderHistoryEntry[];
-      let statsData: any;
+      let statsData: {
+        total: number;
+        completed: number;
+        cancelled: number;
+        totalRevenue: number;
+        averageOrderValue: number;
+        billGeneratedCount: number;
+      };
 
       if (user?.role === 'super_admin') {
         ordersData = await orderHistoryService.getAllOrderHistory();
@@ -118,7 +133,7 @@ export default function OrderHistory() {
         
         <div class="items">
           <h3>Order Items:</h3>
-          ${(order.items || []).map((item: any) => `
+          ${(order.items || []).map((item) => `
             <div class="item">
               <span>${item.quantity}x ${item.name || item.menu_item_name}</span>
               <span>$${(item.price * item.quantity).toFixed(2)}</span>
@@ -268,7 +283,7 @@ export default function OrderHistory() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                ${(stats.totalRevenue || 0).toFixed(2)}
+                {formatCurrency(stats.totalRevenue || 0)}
               </div>
               <p className="text-xs text-muted-foreground">
                 All time revenue
@@ -443,7 +458,7 @@ export default function OrderHistory() {
                 <div>
                   <h4 className="font-medium mb-2">Order Items</h4>
                   <div className="space-y-2">
-                    {(selectedOrder.items || []).map((item: any, index: number) => (
+                    {(selectedOrder.items || []).map((item, index: number) => (
                       <div key={index} className="flex justify-between items-center p-2 bg-muted rounded">
                         <div>
                           <div className="font-medium">{item.name || item.menu_item_name}</div>
